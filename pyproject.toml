@@ -1,0 +1,85 @@
+[project]
+name = "ktsu-ai"
+version = "0.1.0"
+description = "Servicio de IA interno de KTSU: LlamaIndex sobre Qdrant, llamado solo por la API Nest."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.162.2",
+    "google-genai==2.32.0",
+    "llama-index-core==0.14.25",
+    "llama-index-embeddings-google-genai==0.6.0",
+    "llama-index-vector-stores-qdrant==0.10.4",
+    "pydantic-settings==2.16.2",
+    "qdrant-client==1.19.1",
+    "uvicorn==0.54.0",
+]
+
+[project.scripts]
+ktsu-ai = "ktsu_ai.bootstrap.app:main"
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+    "import-linter==2.16",
+    "mypy==2.4.1",
+    "pytest==9.2.0",
+    "ruff==0.17.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.13"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N"]
+# El formateador ya corta las líneas; solo quedan largas las rutas de import.
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ktsu_ai"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+mypy_path = "src"
+packages = ["ktsu_ai"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# Starlette 1.10 avisa de que su TestClient pasará a `httpx2`; seguimos con
+# `httpx`, que es lo que usa también `qdrant-client`, hasta que lo pida de verdad.
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+markers = [
+    "qdrant: necesita un Qdrant real (make test-qdrant); se salta si no hay TEST_QDRANT_URL",
+    "google: llama de verdad a Vertex AI (make test-google); se salta si no hay TEST_GOOGLE_EMBEDDINGS=1",
+]
+
+# Capas como los crates de HANDLE-BUSINESS/backend (plan 01, S1). Cada capa solo
+# puede importar las que están debajo de ella en esta lista.
+[tool.importlinter]
+root_package = "ktsu_ai"
+
+[[tool.importlinter.contracts]]
+name = "Las capas dependen solo hacia abajo"
+type = "layers"
+layers = [
+    "ktsu_ai.bootstrap",
+    "ktsu_ai.http | ktsu_ai.infrastructure",
+    "ktsu_ai.application",
+    "ktsu_ai.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "El dominio no conoce configuración ni utilidades comunes"
+type = "forbidden"
+source_modules = ["ktsu_ai.domain"]
+forbidden_modules = ["ktsu_ai.config", "ktsu_ai.common"]
