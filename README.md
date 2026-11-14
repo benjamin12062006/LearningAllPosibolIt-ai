@@ -74,8 +74,10 @@ make dev                  # servicio en 127.0.0.1:8090, con recarga
 make check                # ruff, formato, mypy, import-linter y pytest
 make test-qdrant          # pruebas contra un Qdrant temporal
 make test-google          # pruebas contra Vertex AI (textos inventados; no es gratis)
-make qdrant-down          # al terminar
+make qdrant-down          # parar conservando el contenedor y su volumen
 ```
+
+En OrbStack, abre el proyecto Compose `estadistica-forms-ai` para iniciar o detener Qdrant. `make qdrant-up` utiliza el volumen existente `estadistica-forms-qdrant-data` y deja disponible el [panel local de Qdrant](http://127.0.0.1:56333/dashboard).
 
 `GET /health` responde sin token. `GET /v1/health` necesita `Authorization: Bearer <AI_SERVICE_TOKEN>` y devuelve 503 si Qdrant no responde.
 

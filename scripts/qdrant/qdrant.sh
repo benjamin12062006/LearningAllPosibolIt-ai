@@ -14,27 +14,35 @@ readonly LIMITS=(--cpus 2 --memory 1g)
 readonly DEV_NAME="estadistica-forms-qdrant"
 readonly DEV_VOLUME="estadistica-forms-qdrant-data"
 readonly DEV_PORT=56333
+readonly DEV_COMPOSE_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compose.yml"
 
 readonly TEST_NAME="estadistica-forms-qdrant-test"
 readonly TEST_PORT=56334
 readonly READY_TIMEOUT_SECONDS=30
 
 start_dev() {
-  if docker ps --format '{{.Names}}' | grep -qx "$DEV_NAME"; then
-    echo "Qdrant de desarrollo ya está en marcha en 127.0.0.1:$DEV_PORT"
-    return
-  fi
-  # `--rm`: el contenedor no queda parado ocupando sitio; los datos viven en el volumen.
-  docker run --detach --rm --name "$DEV_NAME" "${LIMITS[@]}" \
-    --volume "$DEV_VOLUME:/qdrant/storage" \
-    --publish "127.0.0.1:$DEV_PORT:6333" \
-    "$IMAGE" >/dev/null
+  # Compose usa el volumen de desarrollo existente y lo deja fuera de su ciclo de vida.
+  docker volume create "$DEV_VOLUME" >/dev/null
+  stop_legacy_dev_container
+  docker compose -f "$DEV_COMPOSE_FILE" up -d qdrant
   wait_until_ready "$DEV_PORT"
   echo "Qdrant de desarrollo listo en http://127.0.0.1:$DEV_PORT (consola: /dashboard)"
 }
 
+stop_legacy_dev_container() {
+  local legacy_name
+  legacy_name=$(docker container ls --filter "name=^/$DEV_NAME$" \
+    --filter "ancestor=$IMAGE" --filter "volume=$DEV_VOLUME" \
+    --format '{{.Names}}')
+  if [[ "$legacy_name" == "$DEV_NAME" ]] &&
+    [[ "$(docker container inspect --format '{{.HostConfig.AutoRemove}}' "$DEV_NAME")" == true ]]; then
+    docker container stop "$DEV_NAME" >/dev/null
+  fi
+}
+
 stop_dev() {
-  docker stop "$DEV_NAME" >/dev/null 2>&1 || true
+  stop_legacy_dev_container
+  docker compose -f "$DEV_COMPOSE_FILE" stop qdrant
   echo "Qdrant de desarrollo parado"
 }
 
