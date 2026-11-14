@@ -10,6 +10,7 @@ from llama_index.core.llms.mock import MockFunctionCallingLLM
 from ktsu_ai.application.agent_application.agent_service import AgentService
 from ktsu_ai.application.agent_ports.out_operation_gateway import OperationFailedError
 from ktsu_ai.domain.access.access_scope import AccessScope
+from ktsu_ai.domain.agent.agent_outcome import AgentOutcome
 from ktsu_ai.domain.agent.agent_run import (
     AgentOperation,
     AgentRun,
@@ -234,8 +235,14 @@ def test_deadline_covers_workflow_execution(monkeypatch: pytest.MonkeyPatch) -> 
         LlamaIndexAgent(scripted.llm), SlowGateway(), FakeKnowledge()
     )
 
-    outcome = asyncio.run(service.run(RUN))
+    async def run_and_check_inside_the_loop() -> AgentOutcome:
+        outcome = await service.run(RUN)
+        # Dentro del bucle: al cerrarse, `asyncio.run` cancela lo que quede vivo
+        # y escondería una operación que siguiera en marcha tras el plazo.
+        assert forced_to_stop
+        return outcome
+
+    outcome = asyncio.run(run_and_check_inside_the_loop())
 
     assert outcome.status == "limit_reached"
     assert "tiempo" in outcome.answer
-    assert forced_to_stop

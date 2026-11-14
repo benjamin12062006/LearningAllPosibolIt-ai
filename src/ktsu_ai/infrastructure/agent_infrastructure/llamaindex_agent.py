@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import Sequence
+from contextlib import suppress
 from copy import deepcopy
 from typing import Final, Literal
 
@@ -21,7 +22,8 @@ from llama_index.core.tools.types import (
 from llama_index.core.workflow import Context, step
 from pydantic import BaseModel, Field, PrivateAttr
 from pydantic.json_schema import GenerateJsonSchema, JsonSchemaMode
-from workflows.errors import WorkflowTimeoutError
+from workflows.errors import WorkflowCancelledByUser, WorkflowTimeoutError
+from workflows.handler import WorkflowHandler
 
 from ktsu_ai.application.agent_application.agent_service import RUN_TIMEOUT_SECONDS
 from ktsu_ai.application.agent_application.agent_toolbox import AgentToolbox, ToolResult
@@ -77,16 +79,34 @@ class LlamaIndexAgent:
             chat_history=history,
             max_iterations=MAX_MODEL_TURNS + 1,
         )
+        workflow_result = asyncio.ensure_future(handler)
         try:
-            result: object = await handler
+            # `shield`: si vence el plazo de la petición, la cancelación no debe
+            # llegar directamente al workflow. Cancelado así, su bucle de control
+            # termina sin cancelar el paso que espera al modelo, y esa llamada
+            # quedaría abierta (bitácora 02 del agente).
+            result: object = await asyncio.shield(workflow_result)
         except WorkflowTimeoutError:
             raise ModelTimeoutError from None
         except asyncio.CancelledError:
-            await handler.cancel_run()
+            await _stop_workflow(handler, workflow_result)
             raise
         if not isinstance(result, AgentOutput):
             raise TypeError("El workflow devolvió un resultado inesperado.")
         return result.response.content or ""
+
+
+async def _stop_workflow(
+    handler: WorkflowHandler, workflow_result: asyncio.Future[object]
+) -> None:
+    """Pide al workflow que pare, lo que cancela sus pasos, y espera a que termine.
+
+    El workflow acaba con `WorkflowCancelledByUser`. Se recoge aquí: es el final
+    esperado y, sin recogerlo, asyncio avisa de una excepción no leída.
+    """
+    await handler.cancel_run()
+    with suppress(WorkflowCancelledByUser, asyncio.CancelledError):
+        await workflow_result
 
 
 class _ToolboxAgent(FunctionAgent):

@@ -26,3 +26,5 @@ Relacionada con el [plan E6.3b](../../../docs/plans/feature/agente/01-plan-agent
 | Arranque real de Uvicorn en localhost con modelo, embeddings y Nest simulados | Salud 200, petición sin token 401, petición autorizada 200 con `confirmation_required`, única llamada a Nest en modo `prepare` y apagado correcto. |
 
 Las pruebas del agente ejecutan el workflow instalado. Usan respuestas guionizadas, embeddings deterministas y datos sintéticos. No se ejecutó `make test-google`. LlamaIndex emite avisos de deprecación de Pydantic al ejecutar estas pruebas. Queda pendiente la comprobación de extremo a extremo con Nest cuando se implemente E6.3a.
+
+**Corrección posterior (2026-11-13):** la evaluación de la [bitácora 02](02-evaluacion-del-agente.md) encontró que, al vencer el plazo de 120 s, la llamada al modelo seguía viva. La comprobación del plazo de esta etapa no lo detectó porque miraba después de `asyncio.run`, que cancela al cerrar lo que queda vivo. El arreglo y la prueba reforzada están en la bitácora 02.
