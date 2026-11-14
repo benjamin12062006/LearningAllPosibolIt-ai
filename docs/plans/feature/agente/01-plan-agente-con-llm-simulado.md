@@ -54,3 +54,7 @@ Se hace **en paralelo** a H1–H5 de Nest (petición del usuario, 2026-11-13). L
 - Sin streaming ni cancelación: eso es E6.4. El resultado se devuelve entero al final.
 - El código de Nest y sus pruebas corresponden a E6.3a. El contrato A11 se revisa al integrar esa etapa.
 - Qué operaciones van por GraphQL (C7) y cuáles por la ruta interna lo decide E6.3a; el puerto `IOperationGateway` no cambia por ello.
+
+## Requisito pedido desde la web (2026-11-14)
+
+Para ver en vivo lo que hace la IA ([plan ui 04 de la web](../../../../../LearningAllPosibolIt-web/docs/plans/ui/04-plan-sistema-visual-interaccion-y-mascota.md), §7), los eventos `tool.started` y `tool.completed` de **E6.4** deben llevar `target`: el tipo y los IDs de lo que toca la herramienta (hoja, filas y columnas, evaluación o feed). Lo saca Nest de los argumentos ya validados (documento 15, `ai_tool_calls`), nunca del texto del modelo. Se revisa al diseñar E6.4.

@@ -19,8 +19,10 @@ from ktsu_ai.application.knowledge_application.dto_input_replace_source_input im
 from ktsu_ai.application.knowledge_ports.in_knowledge_use_case import (
     IKnowledgeUseCase,
 )
+from ktsu_ai.common.error import AppError, ErrorCode
 from ktsu_ai.domain.knowledge.knowledge_document import SourceKey, SourceType
 from ktsu_ai.http.knowledge_http.dto.knowledge_request_dto import (
+    KnowledgeLimits,
     ReplaceSourceRequest,
     SearchRequest,
 )
@@ -51,6 +53,11 @@ def build_knowledge_router(
         source_id: UuidPath,
         body: ReplaceSourceRequest,
     ) -> ReplaceSourceResponse:
+        if (
+            source_type != SourceType.WORKSHEET
+            and len(body.documents) > KnowledgeLimits.MAX_DOCUMENTS
+        ):
+            raise AppError(ErrorCode.VALIDATION_FAILED)
         key = SourceKey(organization_id, project_id, source_type, source_id)
         documents = tuple(document.to_domain() for document in body.documents)
         output = await knowledge.replace_source(ReplaceSourceInput(key, documents))

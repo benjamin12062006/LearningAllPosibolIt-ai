@@ -18,8 +18,9 @@ from ktsu_ai.domain.knowledge.knowledge_document import (
 
 
 class KnowledgeLimits:
-    # Una hoja tiene como mucho 5.000 filas (límite de E5): cabe en una fuente.
     MAX_DOCUMENTS: Final = 5_000
+    # La hoja lleva el resumen del esquema además de sus 5.000 filas.
+    MAX_WORKSHEET_DOCUMENTS: Final = 5_001
     MAX_TEXT_LENGTH: Final = 8_000
     MAX_METADATA_KEYS: Final = 20
     MAX_METADATA_TEXT: Final = 500
@@ -72,7 +73,9 @@ class DocumentRequest(_Strict):
 
 
 class ReplaceSourceRequest(_Strict):
-    documents: list[DocumentRequest] = Field(max_length=KnowledgeLimits.MAX_DOCUMENTS)
+    documents: list[DocumentRequest] = Field(
+        max_length=KnowledgeLimits.MAX_WORKSHEET_DOCUMENTS
+    )
 
 
 class SearchRequest(_Strict):

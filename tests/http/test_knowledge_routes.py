@@ -162,6 +162,26 @@ def test_replace_source_rejects_more_documents_than_the_limit(
     assert client.put(SOURCE_PATH, headers=AUTHORIZED, json=body).status_code == 400
 
 
+def test_worksheet_allows_a_schema_document_and_five_thousand_rows(
+    client: TestClient, knowledge: FakeKnowledge
+) -> None:
+    path = SOURCE_PATH.replace("/sources/catalog/", "/sources/worksheet/")
+    body = documents_body("schema", *(f"row:{n}" for n in range(5_000)))
+
+    response = client.put(path, headers=AUTHORIZED, json=body)
+
+    assert response.status_code == 200
+    assert response.json()["written"] == 5_001
+    assert knowledge.replaced[0].key.source_type == SourceType.WORKSHEET
+
+
+def test_worksheet_rejects_more_than_its_document_limit(client: TestClient) -> None:
+    path = SOURCE_PATH.replace("/sources/catalog/", "/sources/worksheet/")
+    body = documents_body(*(f"D{n}" for n in range(5_002)))
+
+    assert client.put(path, headers=AUTHORIZED, json=body).status_code == 400
+
+
 @pytest.mark.parametrize(
     "path",
     [
