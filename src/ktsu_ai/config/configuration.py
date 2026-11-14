@@ -20,6 +20,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 MIN_SERVICE_TOKEN_LENGTH: Final = 32
 
 type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+# Niveles de razonamiento de Gemini 3.x (ficha 03 del agente, F1).
+type ThinkingLevel = Literal["MINIMAL", "LOW", "MEDIUM", "HIGH"]
 
 
 class ServerConfiguration(BaseModel):
@@ -56,6 +58,22 @@ class EmbeddingConfiguration(BaseModel):
     google_cloud_location: str = Field(min_length=1)
 
 
+class ChatModelConfiguration(BaseModel):
+    """Modelo de chat del agente: Gemini por Vertex AI (plan 03 del agente, G1)."""
+
+    model: str = Field(min_length=1)
+    # Propia: `gemini-3.5-flash-lite` no existe en `us-central1`, donde están
+    # los embeddings (ficha 03, E6).
+    location: str = Field(min_length=1)
+    # Google recomienda MEDIUM o HIGH para agentes que llaman a APIs (ficha 03, F1).
+    thinking_level: ThinkingLevel
+    # 65.536 es el máximo del modelo; el valor por defecto acota el coste.
+    max_output_tokens: int = Field(ge=1, le=65_536)
+    # Por petición al modelo. La ejecución entera tiene su propio plazo.
+    timeout_seconds: int = Field(ge=1, le=120)
+    google_cloud_project: str = Field(min_length=1)
+
+
 CollectionName = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 
 
@@ -71,11 +89,20 @@ class Configuration(BaseModel):
     knowledge: KnowledgeConfiguration
     nest_agent_base_url: HttpUrl | None = None
     agent_tools_collection: CollectionName = "ktsu_agent_tools"
+    # Sin modelo, el agente está desactivado y su ruta responde 503.
+    chat: ChatModelConfiguration | None = None
 
     @model_validator(mode="after")
     def _validate_distinct_collections(self) -> Self:
         if self.knowledge.collection == self.agent_tools_collection:
             raise ValueError("Las herramientas necesitan su propia colección.")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_agent_can_reach_nest(self) -> Self:
+        # Un agente sin pasarela no podría ejecutar ninguna herramienta.
+        if self.chat is not None and self.nest_agent_base_url is None:
+            raise ValueError("CHAT_MODEL necesita NEST_AGENT_BASE_URL.")
         return self
 
 
@@ -106,6 +133,12 @@ class EnvironmentVariables(BaseSettings):
     # Obligatorio: el proyecto por defecto de `gcloud` puede ser otro.
     google_cloud_project: str = Field(min_length=1)
     google_cloud_location: str = "us-central1"
+    # Vacío: agente desactivado.
+    chat_model: str = ""
+    chat_location: str = "global"
+    chat_thinking_level: ThinkingLevel = "MEDIUM"
+    chat_max_output_tokens: int = 4_096
+    chat_timeout_seconds: int = 60
 
     @field_validator("nest_agent_base_url", mode="before")
     @classmethod

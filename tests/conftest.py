@@ -3,6 +3,8 @@
 - `qdrant`: `make test-qdrant` (contenedor temporal).
 - `google`: `make test-google` (llama a Vertex AI con textos inventados; cuesta
   muy poco, pero no es gratis).
+- `gemini`: `make eval-gemini` (los casos de evaluación con el modelo de chat del
+  `.env`; cuesta céntimos por pasada).
 """
 
 import os
@@ -15,6 +17,7 @@ OPT_IN_MARKERS = {
         "TEST_GOOGLE_EMBEDDINGS",
         "Sin llamadas a Google: ejecuta `make test-google`",
     ),
+    "gemini": ("TEST_GOOGLE_CHAT", "Sin Gemini real: ejecuta `make eval-gemini`"),
 }
 
 

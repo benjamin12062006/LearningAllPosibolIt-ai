@@ -11,6 +11,7 @@ dependencies = [
     "jsonschema==4.26.0",
     "llama-index-core==0.14.25",
     "llama-index-embeddings-google-genai==0.6.0",
+    "llama-index-llms-google-genai==0.11.3",
     "llama-index-vector-stores-qdrant==0.10.4",
     "pydantic-settings==2.16.2",
     "qdrant-client==1.19.1",
@@ -63,6 +64,7 @@ filterwarnings = [
 markers = [
     "qdrant: necesita un Qdrant real (make test-qdrant); se salta si no hay TEST_QDRANT_URL",
     "google: llama de verdad a Vertex AI (make test-google); se salta si no hay TEST_GOOGLE_EMBEDDINGS=1",
+    "gemini: casos de evaluación con Gemini real (make eval-gemini); se salta si no hay TEST_GOOGLE_CHAT=1",
 ]
 
 # Capas como los crates de HANDLE-BUSINESS/backend (plan 01, S1). Cada capa solo

@@ -22,6 +22,9 @@ from ktsu_ai.config.loader import load_configuration
 from ktsu_ai.http.http_server import serve
 from ktsu_ai.http.middleware.internal_auth import InternalAuth
 from ktsu_ai.http.routes import ApiServices, mount_routes
+from ktsu_ai.infrastructure.agent_infrastructure.gemini_chat_model import (
+    create_gemini_chat_model,
+)
 from ktsu_ai.infrastructure.database.qdrant.connection import create_client
 from ktsu_ai.infrastructure.embeddings.google_embedding import create_google_embedding
 
@@ -87,13 +90,22 @@ def create_app_from_environment() -> FastAPI:
     """Para `uvicorn --factory` (recarga en desarrollo) y para `main`."""
     configuration = load_configuration()
     _configure_logging(configuration)
-    return create_app(configuration)
+    return _create_configured_app(configuration)
 
 
 def main() -> None:
     configuration = load_configuration()
     _configure_logging(configuration)
-    serve(create_app(configuration), configuration.server)
+    serve(_create_configured_app(configuration), configuration.server)
+
+
+def _create_configured_app(configuration: Configuration) -> FastAPI:
+    """Con `CHAT_MODEL`, el agente usa Gemini; sin él, queda desactivado (503)."""
+    if configuration.chat is None:
+        return create_app(configuration)
+    return create_app(
+        configuration, agent_llm=create_gemini_chat_model(configuration.chat)
+    )
 
 
 def _configure_logging(configuration: Configuration) -> None:

@@ -4,6 +4,7 @@ from pydantic import SecretStr
 
 from ktsu_ai.config.configuration import (
     AuthConfiguration,
+    ChatModelConfiguration,
     Configuration,
     EmbeddingConfiguration,
     EnvironmentVariables,
@@ -40,6 +41,22 @@ def load_configuration(env_file: str | None = ".env") -> Configuration:
         knowledge=KnowledgeConfiguration(collection=variables.knowledge_collection),
         nest_agent_base_url=variables.nest_agent_base_url,
         agent_tools_collection=variables.agent_tools_collection,
+        chat=_chat_model(variables),
+    )
+
+
+def _chat_model(variables: EnvironmentVariables) -> ChatModelConfiguration | None:
+    """`CHAT_MODEL=` (vacío) deja el agente desactivado."""
+    model = variables.chat_model.strip()
+    if model == "":
+        return None
+    return ChatModelConfiguration(
+        model=model,
+        location=variables.chat_location,
+        thinking_level=variables.chat_thinking_level,
+        max_output_tokens=variables.chat_max_output_tokens,
+        timeout_seconds=variables.chat_timeout_seconds,
+        google_cloud_project=variables.google_cloud_project,
     )
 
 

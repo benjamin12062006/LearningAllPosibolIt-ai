@@ -27,6 +27,13 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "EMBEDDING_TIMEOUT_SECONDS",
         "GOOGLE_CLOUD_PROJECT",
         "GOOGLE_CLOUD_LOCATION",
+        "NEST_AGENT_BASE_URL",
+        "AGENT_TOOLS_COLLECTION",
+        "CHAT_MODEL",
+        "CHAT_LOCATION",
+        "CHAT_THINKING_LEVEL",
+        "CHAT_MAX_OUTPUT_TOKENS",
+        "CHAT_TIMEOUT_SECONDS",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -130,3 +137,68 @@ def test_secrets_never_appear_when_printed(monkeypatch: pytest.MonkeyPatch) -> N
 
     assert VALID_TOKEN not in printed
     assert "clave-secreta-de-qdrant" not in printed
+
+
+@pytest.mark.usefixtures("google_project")
+def test_without_chat_model_the_agent_is_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_SERVICE_TOKEN", VALID_TOKEN)
+    monkeypatch.setenv("CHAT_MODEL", "  ")
+
+    assert load_configuration(env_file=None).chat is None
+
+
+@pytest.mark.usefixtures("google_project")
+def test_chat_model_gets_its_own_location_and_safe_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_SERVICE_TOKEN", VALID_TOKEN)
+    monkeypatch.setenv("CHAT_MODEL", "gemini-3.5-flash-lite")
+    monkeypatch.setenv("NEST_AGENT_BASE_URL", "http://127.0.0.1:8080")
+
+    chat = load_configuration(env_file=None).chat
+
+    assert chat is not None
+    assert chat.model == "gemini-3.5-flash-lite"
+    # No `us-central1` (la de los embeddings): ahí el modelo responde 404.
+    assert chat.location == "global"
+    assert chat.thinking_level == "MEDIUM"
+    assert chat.max_output_tokens == 4_096
+    assert chat.timeout_seconds == 60
+    assert chat.google_cloud_project == "estadistica-forms-api"
+
+
+@pytest.mark.usefixtures("google_project")
+def test_chat_model_without_nest_refuses_to_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_SERVICE_TOKEN", VALID_TOKEN)
+    monkeypatch.setenv("CHAT_MODEL", "gemini-3.5-flash-lite")
+
+    with pytest.raises(ValidationError, match="NEST_AGENT_BASE_URL"):
+        load_configuration(env_file=None)
+
+
+@pytest.mark.usefixtures("google_project")
+@pytest.mark.parametrize(
+    ("variable", "value"),
+    [
+        ("CHAT_THINKING_LEVEL", "EXTREME"),
+        ("CHAT_MAX_OUTPUT_TOKENS", "0"),
+        ("CHAT_MAX_OUTPUT_TOKENS", "65537"),
+        ("CHAT_TIMEOUT_SECONDS", "0"),
+        ("CHAT_TIMEOUT_SECONDS", "121"),
+        ("CHAT_LOCATION", ""),
+    ],
+)
+def test_refuses_out_of_range_chat_settings(
+    monkeypatch: pytest.MonkeyPatch, variable: str, value: str
+) -> None:
+    monkeypatch.setenv("AI_SERVICE_TOKEN", VALID_TOKEN)
+    monkeypatch.setenv("CHAT_MODEL", "gemini-3.5-flash-lite")
+    monkeypatch.setenv("NEST_AGENT_BASE_URL", "http://127.0.0.1:8080")
+    monkeypatch.setenv(variable, value)
+
+    with pytest.raises(ValidationError):
+        load_configuration(env_file=None)

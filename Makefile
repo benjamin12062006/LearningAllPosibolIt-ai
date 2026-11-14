@@ -1,5 +1,5 @@
 # Servicio de IA de KTSU. Comandos del plan 01 («Comandos»).
-.PHONY: install dev check lint format test test-qdrant test-google qdrant-up qdrant-down token
+.PHONY: install dev check lint format test test-qdrant test-google qdrant-up qdrant-down token eval-gemini
 
 install:
 	uv sync --locked
@@ -29,6 +29,10 @@ test-qdrant:
 # Llama a Vertex AI con textos inventados (usa GOOGLE_CLOUD_PROJECT del .env).
 test-google:
 	TEST_GOOGLE_EMBEDDINGS=1 uv run pytest -m google
+
+# Los casos de evaluación con el modelo de chat del .env (CHAT_MODEL). Cuesta dinero.
+eval-gemini:
+	TEST_GOOGLE_CHAT=1 uv run pytest -m gemini tests/evaluation -s -p no:warnings
 
 qdrant-up:
 	scripts/qdrant/qdrant.sh up

@@ -248,6 +248,7 @@
     },
     {
       "id": "modelo-lento",
+      "scripted_only": true,
       "message": "¿Cuántas filas tiene inventario?",
       "offers": ["get_sheet_rows"],
       "script": [{"wait_for_timeout": true}],
@@ -259,6 +260,7 @@
     },
     {
       "id": "limite-de-herramientas",
+      "scripted_only": true,
       "message": "Revisa inventario y haz una sola consulta.",
       "offers": ["get_sheet_rows"],
       "gateway": [

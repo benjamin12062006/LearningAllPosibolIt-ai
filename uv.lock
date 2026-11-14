@@ -736,6 +736,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "llama-index-core" },
     { name = "llama-index-embeddings-google-genai" },
+    { name = "llama-index-llms-google-genai" },
     { name = "llama-index-vector-stores-qdrant" },
     { name = "pydantic-settings" },
     { name = "qdrant-client" },
@@ -759,6 +760,7 @@ requires-dist = [
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "llama-index-core", specifier = "==0.14.25" },
     { name = "llama-index-embeddings-google-genai", specifier = "==0.6.0" },
+    { name = "llama-index-llms-google-genai", specifier = "==0.11.3" },
     { name = "llama-index-vector-stores-qdrant", specifier = "==0.10.4" },
     { name = "pydantic-settings", specifier = "==2.16.2" },
     { name = "qdrant-client", specifier = "==1.19.1" },
@@ -860,6 +862,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/70/ac/ffc116bac024cb0a54b4d28ca9b421e9a08f408c1fcc0039a36de2c0c97b/llama_index_instrumentation-0.6.0.tar.gz", hash = "sha256:b185c4e28a7f32899c27649cc2e2d7d54267fa2ff0cd43cbe2b5212bae98fe3a", size = 56517, upload-time = "2026-08-29T15:33:16.861Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/02/b5/332eb32835360125fa1c90a4b81c58831c48dded5b8426d44e9acd4bf328/llama_index_instrumentation-0.6.0-py3-none-any.whl", hash = "sha256:9588618b271e6c74e58dc81542ea022547c427f036e7cacb655865c4982610bb", size = 16445, upload-time = "2026-08-29T15:33:15.766Z" },
+]
+
+[[package]]
+name = "llama-index-llms-google-genai"
+version = "0.11.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-genai" },
+    { name = "llama-index-core" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/da/d7/a484343c1473b5b164ba0b78d48f53071f7013cbde8df1034beb697c1d40/llama_index_llms_google_genai-0.11.3.tar.gz", hash = "sha256:2fdf9355fbde7b922fa264263f27cff762fa990a3027e735eec83d68a522f2a2", size = 15079, upload-time = "2026-10-14T15:31:57.183Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/6c/f45a0175d40dcbe87e9f85476e4fe27706de52b887893481ba5f60b4ee1e/llama_index_llms_google_genai-0.11.3-py3-none-any.whl", hash = "sha256:fbdbc19fc826e5c9830e0186edd84f4ccda44f39d959a275e49a00a7994ef1c0", size = 15527, upload-time = "2026-10-14T15:31:56.128Z" },
 ]
 
 [[package]]
