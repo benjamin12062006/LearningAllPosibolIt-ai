@@ -16,6 +16,7 @@ from ktsu_ai.domain.agent.agent_run import (
     HistoryMessage,
     JsonObject,
     OperationLevel,
+    RunContext,
     RunIdentity,
 )
 from ktsu_ai.http.knowledge_http.dto.knowledge_request_dto import KnowledgeLimits
@@ -61,6 +62,26 @@ class AgentHistoryRequest(_Strict):
     content: str = Field(min_length=1, max_length=16_000)
 
 
+class AgentContextRequest(_Strict):
+    """Contexto de la ejecución que manda Nest (E6.3a): solo IDs autorizados."""
+
+    workbook_id: UUID | None = Field(default=None, alias="workbookId")
+    worksheet_id: UUID | None = Field(default=None, alias="worksheetId")
+    revision_id: UUID | None = Field(default=None, alias="revisionId")
+    selection_id: UUID | None = Field(default=None, alias="selectionId")
+
+    def to_domain(self) -> RunContext:
+        def text(value: UUID | None) -> str | None:
+            return None if value is None else str(value)
+
+        return RunContext(
+            text(self.workbook_id),
+            text(self.worksheet_id),
+            text(self.revision_id),
+            text(self.selection_id),
+        )
+
+
 TOKEN_PATTERN: Final = re.compile(r"[A-Za-z0-9._~+/-]{1,8192}={0,2}")
 
 
@@ -71,6 +92,7 @@ class AgentRunRequest(_Strict):
     message: str = Field(min_length=1, max_length=16_000)
     history: list[AgentHistoryRequest] = Field(default_factory=list, max_length=50)
     operations: list[AgentOperationRequest] = Field(max_length=256)
+    context: AgentContextRequest = Field(default_factory=AgentContextRequest)
 
     @field_validator("credential", mode="before")
     @classmethod
@@ -88,4 +110,5 @@ class AgentRunRequest(_Strict):
             self.message,
             tuple(HistoryMessage(item.role, item.content) for item in self.history),
             tuple(operation.to_domain() for operation in self.operations),
+            self.context.to_domain(),
         )

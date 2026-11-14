@@ -185,3 +185,25 @@ def test_runs_route_with_scripted_model_and_nest_transport(
         assert any(
             msg.content == "Operación sin permiso" for msg in scripted.messages[1]
         )
+
+
+def test_run_accepts_the_context_from_nest_and_rejects_extra_fields(
+    disabled: TestClient,
+) -> None:
+    body = request_body()
+    body["context"] = {
+        "workbookId": str(uuid4()),
+        "worksheetId": str(uuid4()),
+        "revisionId": None,
+        "selectionId": None,
+    }
+    # Sin modelo configurado, un cuerpo válido llega al servicio (503).
+    assert client_post(disabled, body).status_code == 503
+    body["context"] = {"worksheetId": "no-es-un-uuid"}
+    assert client_post(disabled, body).status_code == 400
+    body["context"] = {"rows": []}
+    assert client_post(disabled, body).status_code == 400
+
+
+def client_post(client: TestClient, body: JsonObject) -> httpx.Response:
+    return client.post(PATH, headers=AUTHORIZED, json=body)

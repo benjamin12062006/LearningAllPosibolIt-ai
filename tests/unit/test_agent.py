@@ -246,3 +246,17 @@ def test_deadline_covers_workflow_execution(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert outcome.status == "limit_reached"
     assert "tiempo" in outcome.answer
+
+
+def test_system_prompt_names_the_run_context() -> None:
+    from ktsu_ai.domain.agent.agent_run import RunContext
+    from ktsu_ai.infrastructure.agent_infrastructure.llamaindex_agent import (
+        SYSTEM_PROMPT,
+        system_prompt_for,
+    )
+
+    assert system_prompt_for(RunContext()) == SYSTEM_PROMPT
+    prompt = system_prompt_for(RunContext(worksheet_id="h-1", selection_id="s-1"))
+    assert "hoja h-1" in prompt
+    assert "selección s-1" in prompt
+    assert "libro" not in prompt

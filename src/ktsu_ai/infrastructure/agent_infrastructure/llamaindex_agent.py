@@ -39,6 +39,7 @@ from ktsu_ai.domain.agent.agent_run import (
     JsonObject,
     JsonValue,
     OperationLevel,
+    RunContext,
 )
 
 MAX_MODEL_TURNS: Final = 10
@@ -52,6 +53,23 @@ SYSTEM_PROMPT: Final = (
     "ask_for_clarification, no en el texto de la respuesta. Una escritura requiere la "
     "confirmación de la persona."
 )
+
+
+def system_prompt_for(context: RunContext) -> str:
+    """El prompt fijo más dónde trabaja la persona, si Nest lo indica."""
+    places = [
+        ("libro", context.workbook_id),
+        ("hoja", context.worksheet_id),
+        ("revisión", context.revision_id),
+        ("selección", context.selection_id),
+    ]
+    known = [f"{name} {value}" for name, value in places if value]
+    if not known:
+        return SYSTEM_PROMPT
+    return (
+        f"{SYSTEM_PROMPT} La persona trabaja en: {', '.join(known)}. Usa esos IDs "
+        "cuando no indique otros."
+    )
 
 
 class LlamaIndexAgent:
@@ -68,7 +86,7 @@ class LlamaIndexAgent:
             toolbox=toolbox,
             tools=_build_tools(operations, toolbox),
             llm=self._llm,
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=system_prompt_for(run.context),
             streaming=False,
             allow_parallel_tool_calls=False,
             timeout=RUN_TIMEOUT_SECONDS,

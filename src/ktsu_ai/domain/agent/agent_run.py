@@ -47,11 +47,22 @@ class HistoryMessage:
 
 
 @dataclass(frozen=True)
+class RunContext:
+    """Dónde trabaja la persona: lo fija Nest con IDs ya autorizados."""
+
+    workbook_id: str | None = None
+    worksheet_id: str | None = None
+    revision_id: str | None = None
+    selection_id: str | None = None
+
+
+@dataclass(frozen=True)
 class AgentRun:
     identity: RunIdentity
     message: str
     history: tuple[HistoryMessage, ...]
     operations: tuple[AgentOperation, ...]
+    context: RunContext = field(default_factory=RunContext)
 
     def __post_init__(self) -> None:
         names: set[str] = set()
