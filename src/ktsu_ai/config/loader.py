@@ -38,6 +38,8 @@ def load_configuration(env_file: str | None = ".env") -> Configuration:
             google_cloud_location=variables.google_cloud_location,
         ),
         knowledge=KnowledgeConfiguration(collection=variables.knowledge_collection),
+        nest_agent_base_url=variables.nest_agent_base_url,
+        agent_tools_collection=variables.agent_tools_collection,
     )
 
 

@@ -7,11 +7,14 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi==0.162.2",
     "google-genai==2.32.0",
+    "httpx==0.28.1",
+    "jsonschema==4.26.0",
     "llama-index-core==0.14.25",
     "llama-index-embeddings-google-genai==0.6.0",
     "llama-index-vector-stores-qdrant==0.10.4",
     "pydantic-settings==2.16.2",
     "qdrant-client==1.19.1",
+    "referencing==0.37.0",
     "uvicorn==0.54.0",
 ]
 
@@ -20,7 +23,6 @@ ktsu-ai = "ktsu_ai.bootstrap.app:main"
 
 [dependency-groups]
 dev = [
-    "httpx==0.28.1",
     "import-linter==2.16",
     "mypy==2.4.1",
     "pytest==9.2.0",

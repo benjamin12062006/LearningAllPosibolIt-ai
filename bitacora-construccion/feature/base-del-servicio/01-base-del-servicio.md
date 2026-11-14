@@ -3,7 +3,7 @@
 Fecha de creación: 2026-11-09  
 Última actualización: 2026-11-09  
 Estado: Implementado y verificado (2026-11-09). Sin commit: el repositorio está recién creado (`git init`, rama `main`) y los commits los pide el usuario.  
-Relacionada con: [plan 01](../../../docs/plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [fuentes 01](../../../docs/fonts/feature/base-del-servicio/01-fuentes-de-la-base-del-servicio.md), [plan E6 de la API](../../../../claudeLearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md).
+Relacionada con: [plan 01](../../../docs/plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [fuentes 01](../../../docs/fonts/feature/base-del-servicio/01-fuentes-de-la-base-del-servicio.md), [plan E6 de la API](../../../../LearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md).
 
 ## Necesidad
 

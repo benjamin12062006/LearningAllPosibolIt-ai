@@ -1,10 +1,10 @@
 # 01 — Servicio de IA: arquitectura, configuración y base (E6.0)
 
 Fecha de creación: 2026-11-09  
-Última actualización: 2026-11-09  
-Estado: En curso. E6.0 y E6.1a hechas y verificadas (2026-11-09).  
-Ámbito: `claudeLearningAllPosibolIt-ai`. Las etapas que tocan también la API están en el [plan E6](../../../../../claudeLearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md).  
-Relacionada con: [fuentes 01](../../../fonts/feature/base-del-servicio/01-fuentes-de-la-base-del-servicio.md), [revisión 02 de LlamaIndex](../../../../../claudeLearningAllPosibolIt/docs/fonts/feature/ai-assistant/02-revision-de-llamaindex-para-la-api.md).
+Última actualización: 2026-11-13
+Estado: En curso. E6.0 y E6.1a verificadas el 2026-11-09. E6.3b verificada con LLM simulado el 2026-11-13.
+Ámbito: `LearningAllPosibolIt-ai`. Las etapas que tocan también la API están en el [plan E6](../../../../../LearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md).  
+Relacionada con: [fuentes 01](../../../fonts/feature/base-del-servicio/01-fuentes-de-la-base-del-servicio.md), [revisión 02 de LlamaIndex](../../../../../LearningAllPosibolIt/docs/fonts/feature/ai-assistant/02-revision-de-llamaindex-para-la-api.md).
 
 ## Qué es este servicio
 
@@ -26,7 +26,7 @@ El «cerebro» de la IA de KTSU. Con LlamaIndex indexa en Qdrant lo que Nest le 
 ## Árbol
 
 ```text
-claudeLearningAllPosibolIt-ai/
+LearningAllPosibolIt-ai/
 ├── pyproject.toml            dependencias, ruff, mypy, pytest e import-linter
 ├── uv.lock · .python-version · .env.example · Makefile · README.md
 ├── src/ktsu_ai/
@@ -87,5 +87,5 @@ make qdrant-down  # parar Qdrant al terminar
 
 1. ✅ **E6.0 — Base** (S1–S8), [bitácora 01](../../../../bitacora-construccion/feature/base-del-servicio/01-base-del-servicio.md). *Ajustado en E6.0:* `check_compatibility=False` en el cliente y la regla de versiones en `QdrantProbe`; plazo de Qdrant en segundos enteros. Comprobación: unitarias del caso de uso y la configuración; HTTP con `TestClient` (sin token 401, token incorrecto 401, `/health` sin token, `/v1/health` 200 y 503 con Qdrant simulado caído, `X-Request-Id`, registro sin token); integración con Qdrant real; `import-linter` con sus contratos; defectos a propósito (romper la comparación del token, la dirección de una capa, el 503) y arranque real con `make dev`.
 2. ✅ **E6.1a — Conocimiento**, [bitácora 02](../../../../bitacora-construccion/feature/base-del-servicio/02-indexar-el-conocimiento.md). *Ajustado en E6.1a:* embeddings de Google por Vertex AI (`gemini-embedding-001`, 768) en lugar de FastEmbed, búsqueda solo densa y campo propio `knowledge_document_id` (LlamaIndex usa `document_id`). Comprobado contra Vertex AI (`make test-google`).
-3. **E6.3 — Agente**: `FunctionAgent`, selección de herramientas por búsqueda y confirmaciones (plan E6).
+3. **E6.3b — Agente con LLM simulado**. `FunctionAgent`, selección en Qdrant y respuesta de confirmación verificados en FastAPI. El catálogo, el token de ejecución emitido por Nest y la confirmación humana se integran en E6.3a. [Plan del agente](../agente/01-plan-agente-con-llm-simulado.md) · [Bitácora](../../../../bitacora-construccion/feature/agente/01-agente-con-llm-simulado.md).
 4. **E6.4–E6.6**: streaming, modelo real con evaluación y despliegue (plan E6).

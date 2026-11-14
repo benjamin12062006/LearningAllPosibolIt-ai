@@ -3,7 +3,7 @@
 Fecha de creación: 2026-11-09  
 Última actualización: 2026-11-09  
 Estado: Implementado y verificado (2026-11-09), también contra Vertex AI una vez que el usuario lo activó. Sin commit.  
-Relacionada con: [plan 01 del servicio](../../../docs/plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [plan E6 de la API](../../../../claudeLearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md) (D4, D5, D7), [ficha 03 de la API](../../../../claudeLearningAllPosibolIt/docs/fonts/feature/ai-assistant/03-fuentes-de-indexar-el-conocimiento.md), [bitácora 01](01-base-del-servicio.md).
+Relacionada con: [plan 01 del servicio](../../../docs/plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [plan E6 de la API](../../../../LearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md) (D4, D5, D7), [ficha 03 de la API](../../../../LearningAllPosibolIt/docs/fonts/feature/ai-assistant/03-fuentes-de-indexar-el-conocimiento.md), [bitácora 01](01-base-del-servicio.md).
 
 ## Necesidad
 

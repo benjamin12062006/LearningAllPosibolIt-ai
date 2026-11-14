@@ -3,7 +3,7 @@
 Fecha de creación: 2026-11-09  
 Última actualización: 2026-11-09  
 Estado: Cerrada para E6.0.  
-Relacionada con: [plan 01 del servicio](../../../plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [plan E6 de la API](../../../../../claudeLearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md), [revisión 02 de LlamaIndex](../../../../../claudeLearningAllPosibolIt/docs/fonts/feature/ai-assistant/02-revision-de-llamaindex-para-la-api.md).
+Relacionada con: [plan 01 del servicio](../../../plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [plan E6 de la API](../../../../../LearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md), [revisión 02 de LlamaIndex](../../../../../LearningAllPosibolIt/docs/fonts/feature/ai-assistant/02-revision-de-llamaindex-para-la-api.md).
 
 ## Referencia de arquitectura (E)
 

@@ -1,10 +1,10 @@
 # KTSU AI — servicio de IA interno
 
 Fecha de creación: 2026-11-09  
-Última actualización: 2026-11-09  
-Relacionada con: [plan 01 del servicio](docs/plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [plan E6 de la API](../claudeLearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md).
+Última actualización: 2026-11-13
+Relacionada con: [plan 01 del servicio](docs/plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [plan E6 de la API](../LearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md).
 
-Servicio Python con FastAPI y LlamaIndex que indexa en Qdrant lo que le manda la API Nest (embeddings de Google por Vertex AI), busca con el filtro de la organización y, desde E6.3, ejecutará el agente. No es público ni tiene base de datos propia: solo lo llama Nest, con un token de servicio.
+Servicio Python con FastAPI y LlamaIndex que indexa en Qdrant lo que le manda la API Nest (embeddings de Google por Vertex AI), busca con el filtro de la organización y ejecuta el agente cuando recibe un modelo de llamada a funciones. No es público ni tiene base de datos propia: solo lo llama Nest, con un token de servicio.
 
 ## Capas
 
@@ -78,6 +78,21 @@ make qdrant-down          # al terminar
 ```
 
 `GET /health` responde sin token. `GET /v1/health` necesita `Authorization: Bearer <AI_SERVICE_TOKEN>` y devuelve 503 si Qdrant no responde.
+
+## Agente con LLM simulado (E6.3b)
+
+`POST /v1/agent/runs` usa el token de servicio en `Authorization`. El cuerpo lleva la credencial efímera de la ejecución y el catálogo autorizado por Nest. FastAPI prioriza hasta ocho operaciones mediante la colección de herramientas en Qdrant, añade la búsqueda de conocimiento y la aclaración, y devuelve el resultado del turno.
+
+Las lecturas usan `mode: "execute"`. Las escrituras usan `mode: "prepare"` y devuelven el resumen de Nest con `confirmation_required`. La confirmación humana se tramita en Nest. El arranque desde el entorno responde `503 AGENT_UNAVAILABLE` en esta ruta hasta que se conecte un modelo de chat.
+
+Las pruebas inyectan `MockFunctionCallingLLM` en `create_app`. El guion indica las llamadas y respuestas que debe emitir el modelo. El workflow de LlamaIndex, la ruta y la pasarela se ejecutan con el contrato de Nest simulado y embeddings deterministas.
+
+```bash
+uv run pytest tests/unit/test_agent.py tests/http/test_agent_routes.py
+make test-qdrant
+```
+
+[Plan y contrato E6.3b](docs/plans/feature/agente/01-plan-agente-con-llm-simulado.md) · [Bitácora del agente](bitacora-construccion/feature/agente/01-agente-con-llm-simulado.md)
 
 ## Registros
 

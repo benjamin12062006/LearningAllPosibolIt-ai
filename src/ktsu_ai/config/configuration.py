@@ -4,9 +4,16 @@ Las variables del proceso ganan a las del archivo `.env`. Los secretos son
 `SecretStr`: al imprimir la configuración salen como `**********`.
 """
 
-from typing import Final, Literal
+from typing import Annotated, Final, Literal, Self
 
-from pydantic import BaseModel, Field, HttpUrl, SecretStr
+from pydantic import (
+    BaseModel,
+    Field,
+    HttpUrl,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 32 caracteres aleatorios son 190 bits o más con el alfabeto de `make token`.
@@ -49,8 +56,11 @@ class EmbeddingConfiguration(BaseModel):
     google_cloud_location: str = Field(min_length=1)
 
 
+CollectionName = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+
+
 class KnowledgeConfiguration(BaseModel):
-    collection: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    collection: CollectionName
 
 
 class Configuration(BaseModel):
@@ -59,6 +69,14 @@ class Configuration(BaseModel):
     qdrant: QdrantConfiguration
     embedding: EmbeddingConfiguration
     knowledge: KnowledgeConfiguration
+    nest_agent_base_url: HttpUrl | None = None
+    agent_tools_collection: CollectionName = "ktsu_agent_tools"
+
+    @model_validator(mode="after")
+    def _validate_distinct_collections(self) -> Self:
+        if self.knowledge.collection == self.agent_tools_collection:
+            raise ValueError("Las herramientas necesitan su propia colección.")
+        return self
 
 
 class EnvironmentVariables(BaseSettings):
@@ -78,6 +96,8 @@ class EnvironmentVariables(BaseSettings):
     qdrant_api_key: SecretStr | None = None
     qdrant_timeout_seconds: int = 5
     knowledge_collection: str = "ktsu_knowledge"
+    nest_agent_base_url: HttpUrl | None = None
+    agent_tools_collection: CollectionName = "ktsu_agent_tools"
     embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 768
     embedding_batch_size: int = 32
@@ -86,3 +106,8 @@ class EnvironmentVariables(BaseSettings):
     # Obligatorio: el proyecto por defecto de `gcloud` puede ser otro.
     google_cloud_project: str = Field(min_length=1)
     google_cloud_location: str = "us-central1"
+
+    @field_validator("nest_agent_base_url", mode="before")
+    @classmethod
+    def _blank_url_is_unset(cls, value: object) -> object:
+        return None if value == "" else value

@@ -18,6 +18,7 @@ class ErrorCode(StrEnum):
     INTERNAL_ERROR = "INTERNAL_ERROR"
     KNOWLEDGE_DOCUMENT_DUPLICATED = "KNOWLEDGE_DOCUMENT_DUPLICATED"
     KNOWLEDGE_UNAVAILABLE = "KNOWLEDGE_UNAVAILABLE"
+    AGENT_UNAVAILABLE = "AGENT_UNAVAILABLE"
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,13 @@ ERRORS: Final[dict[ErrorCode, ErrorDefinition]] = {
         LocalizedMessage(
             es="El índice de conocimiento no está disponible ahora. Reinténtalo.",
             en="The knowledge index is not available right now. Try again.",
+        ),
+    ),
+    ErrorCode.AGENT_UNAVAILABLE: ErrorDefinition(
+        503,
+        LocalizedMessage(
+            es="El agente de IA no está disponible ahora.",
+            en="The AI agent is currently unavailable.",
         ),
     ),
 }
