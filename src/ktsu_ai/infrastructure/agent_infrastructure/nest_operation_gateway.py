@@ -6,7 +6,10 @@ from urllib.parse import quote
 import httpx
 from pydantic import TypeAdapter, ValidationError
 
-from ktsu_ai.application.agent_ports.out_operation_gateway import OperationFailedError
+from ktsu_ai.application.agent_ports.out_operation_gateway import (
+    OperationFailedError,
+    Preparation,
+)
 from ktsu_ai.domain.agent.agent_run import JsonObject, JsonValue, RunIdentity
 
 NEST_REJECTIONS: Final = frozenset({400, 403, 404, 409})
@@ -27,7 +30,7 @@ class NestOperationGateway:
 
     async def prepare(
         self, identity: RunIdentity, operation: str, arguments: JsonObject
-    ) -> str:
+    ) -> Preparation:
         response = await self._send(identity, operation, "prepare", arguments)
         summary = response.get("summary") if isinstance(response, dict) else None
         if (
@@ -35,7 +38,9 @@ class NestOperationGateway:
             or not 0 < len(summary.strip()) <= MAX_CONFIRMATION_LENGTH
         ):
             raise OperationFailedError(INVALID_PREPARATION)
-        return summary.strip()
+        if isinstance(response, dict) and response.get("status") == "confirmed":
+            return Preparation(summary.strip(), True, response.get("result"))
+        return Preparation(summary.strip())
 
     async def _send(
         self,

@@ -54,6 +54,11 @@ class RunContext:
     worksheet_id: str | None = None
     revision_id: str | None = None
     selection_id: str | None = None
+    section: str | None = None
+    catalog_snapshot_id: str | None = None
+    evaluation_id: str | None = None
+    ruleset_revision: int | None = None
+    language: Literal["en", "es"] | None = None
 
 
 @dataclass(frozen=True)

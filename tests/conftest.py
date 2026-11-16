@@ -23,7 +23,9 @@ OPT_IN_MARKERS = {
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for marker, (variable, reason) in OPT_IN_MARKERS.items():
-        if os.environ.get(variable):
+        value = os.environ.get(variable)
+        enabled = bool(value) if marker == "qdrant" else value == "1"
+        if enabled:
             continue
         skip = pytest.mark.skip(reason=reason)
         for item in items:

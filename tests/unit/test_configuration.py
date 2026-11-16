@@ -163,8 +163,8 @@ def test_chat_model_gets_its_own_location_and_safe_defaults(
     assert chat.model == "gemini-3.5-flash-lite"
     # No `us-central1` (la de los embeddings): ahí el modelo responde 404.
     assert chat.location == "global"
-    assert chat.thinking_level == "MEDIUM"
-    assert chat.max_output_tokens == 4_096
+    assert chat.thinking_level == "HIGH"
+    assert chat.max_output_tokens == 65_536
     assert chat.timeout_seconds == 60
     assert chat.google_cloud_project == "estadistica-forms-api"
 

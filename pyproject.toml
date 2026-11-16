@@ -13,6 +13,7 @@ dependencies = [
     "llama-index-embeddings-google-genai==0.6.0",
     "llama-index-llms-google-genai==0.11.3",
     "llama-index-vector-stores-qdrant==0.10.4",
+    "mcp==2.3.0",
     "pydantic-settings==2.16.2",
     "qdrant-client==1.19.1",
     "referencing==0.37.0",
@@ -21,6 +22,8 @@ dependencies = [
 
 [project.scripts]
 ktsu-ai = "ktsu_ai.bootstrap.app:main"
+ktsu-mcp = "ktsu_ai.bootstrap.mcp:main"
+ktsu-mcp-http = "ktsu_ai.bootstrap.mcp_http:main"
 
 [dependency-groups]
 dev = [
@@ -77,7 +80,7 @@ name = "Las capas dependen solo hacia abajo"
 type = "layers"
 layers = [
     "ktsu_ai.bootstrap",
-    "ktsu_ai.http | ktsu_ai.infrastructure",
+    "ktsu_ai.http | ktsu_ai.infrastructure | ktsu_ai.mcp_server",
     "ktsu_ai.application",
     "ktsu_ai.domain",
 ]

@@ -19,6 +19,7 @@ class ErrorCode(StrEnum):
     KNOWLEDGE_DOCUMENT_DUPLICATED = "KNOWLEDGE_DOCUMENT_DUPLICATED"
     KNOWLEDGE_UNAVAILABLE = "KNOWLEDGE_UNAVAILABLE"
     AGENT_UNAVAILABLE = "AGENT_UNAVAILABLE"
+    AGENT_MODEL_RATE_LIMITED = "AGENT_MODEL_RATE_LIMITED"
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,13 @@ ERRORS: Final[dict[ErrorCode, ErrorDefinition]] = {
         LocalizedMessage(
             es="El agente de IA no está disponible ahora.",
             en="The AI agent is currently unavailable.",
+        ),
+    ),
+    ErrorCode.AGENT_MODEL_RATE_LIMITED: ErrorDefinition(
+        429,
+        LocalizedMessage(
+            es="Gemini está limitando las solicitudes.",
+            en="Gemini is rate-limiting requests.",
         ),
     ),
 }

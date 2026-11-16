@@ -2,7 +2,8 @@
 
 Fecha de creación: 2026-11-14  
 Última actualización: 2026-11-14  
-Estado: Plan.  
+Estado: Piloto local implementado y verificado. Pruebas y configuración en la [bitácora 04](../../../../bitacora-construccion/feature/agente/04-servidor-mcp-local.md).
+
 Ámbito: FastAPI y catálogo de Nest, E6.7.  
 Relacionada con: [fuentes 04](../../../fonts/feature/agente/04-fuentes-del-servidor-mcp.md), [plan del agente](01-plan-agente-con-llm-simulado.md), [plan E6](../../../../../LearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md), [acceso externo y CLI](../../../../../LearningAllPosibolIt/docs/plans/feature/ai-assistant/07-plan-acceso-externo-y-cli.md).  
 Revisión de partida: FastAPI `d9f00fd`, Nest `7be788b`.
@@ -14,7 +15,7 @@ Un cliente externo puede descubrir y ejecutar las herramientas autorizadas por N
 | Entrada | Recorrido |
 | --- | --- |
 | Chat de KTSU | Nuxt → Nest → FastAPI → Gemini. Nest guarda la conversación y decide acceso y efectos. |
-| MCP externo | Codex, Claude Code o cliente compatible → servidor MCP de FastAPI. El cliente usa su propio modelo. FastAPI pide a Nest la autorización del proyecto, consulta LlamaIndex y Qdrant para conocimiento y pasa las lecturas oficiales y propuestas por la pasarela de integración. |
+| MCP externo | Cliente compatible → servidor `stdio` del proyecto Python → pasarela Nest. El cliente usa su propio modelo. Para conocimiento, Nest envía el ámbito autorizado a FastAPI, que consulta LlamaIndex y Qdrant. |
 | CLI | Terminal o agente local → CLI de KTSU → API Nest. Para una operación de conocimiento habilitada, Nest autoriza el proyecto y usa FastAPI por HTTP interno. |
 
 | ID | Decisión propuesta | Evidencia |
@@ -37,3 +38,9 @@ Un cliente externo puede descubrir y ejecutar las herramientas autorizadas por N
 En el recorrido local de D6, sembrar marcadores distintos en dos proyectos de la misma organización y en otra organización. La búsqueda con LlamaIndex y Qdrant responde con resultados del proyecto concedido; pruebas de credencial vencida, revocación durante la consulta y argumentos de otro ámbito comprueban que la búsqueda respeta la decisión de Nest. Probar el chat nativo por su contrato HTTP y las lecturas y propuestas del servidor MCP por la pasarela de integración.
 
 El montaje remoto queda para después de probar el flujo local y su política de autorización. La página Integraciones entrega comandos, enlaces y archivos de la versión comprobada. [Contexto de Integraciones](../../../../../CONTEXTO-SIGUIENTE-CHAT-UI.md).
+
+## Ajustes del piloto
+
+- El SDK Python oficial quedó fijado en `mcp==2.3.0` y el cliente de prueba lanza `ktsu-mcp` por `stdio`. El [README](../../../../README.md#servidor-mcp-local) contiene la plantilla de arranque.
+- El proceso MCP utiliza el token del adaptador local y la delegación del usuario. Nest usa su propia identidad de servicio para llamar a `/v1/knowledge/search` en FastAPI. Así, `AI_SERVICE_TOKEN` permanece en el entorno de los backends y Nest vuelve a validar el alcance antes de entregar los resultados.
+- Los pasos 1–4 corresponden al transporte local y al [contrato REST de Integraciones](../../../../../LearningAllPosibolIt/contracts/integrations/README.md). El paso 5 conserva la validación por aplicación cliente y el despliegue remoto con OAuth.

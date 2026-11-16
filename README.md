@@ -1,7 +1,7 @@
 # KTSU AI — servicio de IA interno
 
 Fecha de creación: 2026-11-09  
-Última actualización: 2026-11-13
+Última actualización: 2026-11-14
 Relacionada con: [plan 01 del servicio](docs/plans/feature/base-del-servicio/01-plan-servicio-de-ia.md), [plan E6 de la API](../LearningAllPosibolIt/docs/plans/feature/ai-assistant/01-plan-e6-ia-con-qdrant-y-llamaindex.md).
 
 Servicio Python con FastAPI y LlamaIndex que indexa en Qdrant lo que le manda la API Nest (embeddings de Google por Vertex AI), busca con el filtro de la organización y ejecuta el agente cuando recibe un modelo de llamada a funciones. No es público ni tiene base de datos propia: solo lo llama Nest, con un token de servicio.
@@ -99,3 +99,47 @@ make test-qdrant
 ## Registros
 
 Una línea por petición con método, ruta, estado, duración y `request_id` (el `X-Request-Id` de Nest si llega uno válido). No se registran tokens, cuerpos ni query strings.
+## Servidor MCP local
+
+El proceso `ktsu-mcp` usa el transporte `stdio`. Un cliente compatible lo inicia como subproceso. Nest decide qué herramientas puede usar la credencial de proyecto. El agente externo aporta su modelo.
+
+1. Configura en Nest `MCP_ADAPTER_SERVICE_TOKEN` con un secreto aleatorio independiente de `AI_SERVICE_TOKEN`. El administrador del entorno local proporciona el mismo valor al proceso MCP como `KTSU_MCP_ADAPTER_TOKEN`.
+2. Con una sesión Descope, emite una credencial de proyecto desde el [contrato de Integraciones](../LearningAllPosibolIt/contracts/integrations/README.md). Usa el valor devuelto en `KTSU_MCP_CREDENTIAL`.
+3. Instala con `make install`, apunta `KTSU_NEST_URL` a `http://127.0.0.1:8080` y configura el cliente para iniciar el ejecutable `.venv/bin/ktsu-mcp` por su ruta absoluta. El cliente debe pasar las tres variables al proceso. La salida estándar transporta los mensajes MCP.
+
+Ejemplo de parámetros para un cliente `stdio`. Sustituye los marcadores mediante el mecanismo de secretos que emplee el cliente.
+
+```json
+{
+  "command": "<RUTA_ABSOLUTA_DEL_SERVICIO_AI>/.venv/bin/ktsu-mcp",
+  "env": {
+    "KTSU_NEST_URL": "http://127.0.0.1:8080",
+    "KTSU_MCP_ADAPTER_TOKEN": "<SECRETO_LOCAL_DEL_ADAPTADOR>",
+    "KTSU_MCP_CREDENTIAL": "<CREDENCIAL_MCP_DEL_PROYECTO>"
+  }
+}
+```
+
+El recorrido reproducible del servidor MCP y del chat usa Nest, FastAPI, PGlite, Qdrant y un modelo de prueba. Desde el repositorio de Nest, después de instalar las dependencias de ambos servicios.
+
+```bash
+pnpm test:features:compile
+KTSU_E2E_AI_DIR=../LearningAllPosibolIt-ai \
+  node --experimental-vm-modules node_modules/jest/bin/jest.js \
+  --config jest.features.config.mjs --runInBand \
+  .test-build/test/features/integrations/local-stack.e2e-spec.js
+```
+
+La prueba usa Qdrant en memoria por defecto. `KTSU_TEST_QDRANT_URL=http://127.0.0.1:56334` apunta a un Qdrant local desechable. Para clientes alojados, el [plan de MCP](docs/plans/feature/agente/04-plan-servidor-mcp-local.md) describe el siguiente despliegue con transporte autenticado.
+
+## MCP remoto con Descope
+
+El servidor HTTP vive en el mismo paquete que el MCP local. El proxy HTTPS publica únicamente `/mcp` y `/.well-known/oauth-protected-resource/mcp`. Conserva el `Host` público. Nest sigue privado para este proceso.
+
+1. Define primero un endpoint HTTPS estable para staging con ruta `/mcp`. Usa la misma URL exacta en el borde, en el Resource de Descope y en ambos backends.
+2. En Descope, crea un Resource de tipo MCP y un template de registro con flujo de login y consentimiento. Usa Authorization Code con PKCE S256, DCR para el piloto y tokens de acceso cortos (por ejemplo, 5–15 minutos). Habilita el acceso de usuario y deniega Client Credentials. Registra los scopes `ktsu:mcp:read` y `ktsu:mcp:prepare`; configura el segundo como opcional. Desde Nest, `node scripts/descope/ensure-mcp-resource.mjs` muestra la configuración con `MCP_OAUTH_RESOURCE_URL` y `DESCOPE_MCP_REGISTRATION_TEMPLATE_ID`. Añade `--apply` para crear un Resource ausente con la Management Key de ese proyecto. [Administración por API de Descope](https://docs.descope.com/agentic-identity-hub/core-components/mcp-servers/management)
+3. Copia el issuer exacto que devuelve Discovery en Descope. En Nest configura `MCP_OAUTH_RESOURCE_URL`, `MCP_OAUTH_ISSUER`, `MCP_OAUTH_ORGANIZATION_ID` y `MCP_OAUTH_PROJECT_ID`. Usa el mismo proyecto Descope de la sesión web del entorno. Aplica la migración de grants de Nest.
+4. En el proceso remoto configura `KTSU_MCP_RESOURCE_URL`, `KTSU_MCP_OAUTH_ISSUER`, `KTSU_NEST_URL` y `KTSU_MCP_ADAPTER_TOKEN`. Este último coincide con `MCP_ADAPTER_SERVICE_TOKEN` de Nest. El runtime verifica con el SDK de Descope y sus claves públicas; la Management Key se usa solo para administración.
+5. Ejecuta `uv run ktsu-mcp-http` detrás del proxy local (puerto 8091). En un contenedor, el equivalente es `uv run uvicorn --factory ktsu_ai.bootstrap.mcp_http:create_app_from_environment --host 0.0.0.0 --port "$PORT" --no-access-log`. Comprueba el 401 con el encabezado Bearer y la metadata. Tras emitir un grant OAuth desde KTSU, conecta un cliente HTTP, completa el consentimiento y comprueba listado, lectura, preparación y revocación.
+
+El piloto configura un proyecto KTSU por instancia. El [contrato de Integraciones](../LearningAllPosibolIt/contracts/integrations/README.md) describe el alta del grant y los estados que consume Nuxt. Para el uso alojado, aplica el [plan de OAuth](docs/plans/feature/agente/05-plan-oauth-mcp-descope.md).

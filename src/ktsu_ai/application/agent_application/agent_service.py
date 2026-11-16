@@ -28,7 +28,7 @@ class AgentService:
         self,
         model: IAgentModel,
         gateway: IOperationGateway,
-        knowledge: IKnowledgeUseCase,
+        knowledge: IKnowledgeUseCase | None = None,
         selector: IOperationSelector | None = None,
     ) -> None:
         self._model = model
