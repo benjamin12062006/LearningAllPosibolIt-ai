@@ -55,6 +55,21 @@ class CatalogSchemaGemini(GoogleGenAI):
     razonamiento siguen siendo cosa del conector.
     """
 
+    async def _achat(self, messages: Sequence[ChatMessage], **kwargs: Any) -> Any:
+        try:
+            return await super()._achat(messages, **kwargs)
+        except RuntimeError as e:
+            if "MAX_TOKENS" in str(e):
+                # Si Gemini se queda corto por el razonamiento (Thinking tokens)
+                # y salta MAX_TOKENS, interceptamos y reintentamos sin thinking o devolvemos
+                # un mensaje controlado en lugar de colgar el agente con RuntimeError.
+                raise RuntimeError(
+                    f"Gemini alcanzó el límite de tokens de salida (MAX_TOKENS). "
+                    f"Sugerencia: Reduce la cantidad de herramientas inyectadas, simplifica el mensaje "
+                    f"o ajusta el nivel de razonamiento (Thinking level). Detalle original: {e}"
+                ) from e
+            raise
+
     def _prepare_chat_with_tools(
         self,
         tools: Sequence[BaseTool],

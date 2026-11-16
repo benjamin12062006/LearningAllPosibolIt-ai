@@ -30,14 +30,22 @@ from ktsu_ai.domain.agent.agent_run import (
     OperationLevel,
 )
 
-MAX_TOOL_CALLS: Final = 8
+MAX_TOOL_CALLS: Final = 20
 MAX_TOOL_OUTPUT_LENGTH: Final = 16_000
 MAX_TOOL_OUTPUT_TOTAL: Final = 64 * 1024
 KNOWLEDGE_RESULTS: Final = 8
 MAX_QUERY_LENGTH: Final = 1_000
-TOOL_LIMIT_MESSAGE: Final = "Se alcanzó el límite de llamadas a herramientas."
+TOOL_LIMIT_MESSAGE: Final = (
+    "Se alcanzó el límite de llamadas de este turno. "
+    "Puedes continuar la tarea con otro mensaje."
+)
 TIME_LIMIT_MESSAGE: Final = "Se agotó el tiempo de ejecución del agente."
 MODEL_LIMIT_MESSAGE: Final = "Se alcanzó el límite de turnos del agente."
+ENGLISH_LIMITS: Final = {
+    TOOL_LIMIT_MESSAGE: "This turn reached its tool call limit. You can continue in another message.",
+    TIME_LIMIT_MESSAGE: "The assistant ran out of time.",
+    MODEL_LIMIT_MESSAGE: "The assistant reached its turn limit.",
+}
 
 
 @dataclass(frozen=True)
@@ -52,10 +60,11 @@ class AgentToolbox:
         run: AgentRun,
         operations: tuple[AgentOperation, ...],
         gateway: IOperationGateway,
-        knowledge: IKnowledgeUseCase,
+        knowledge: IKnowledgeUseCase | None,
         validates: Callable[[JsonObject, JsonObject], bool],
     ) -> None:
         self._identity = run.identity
+        self._language = run.context.language
         self._operations = {operation.name: operation for operation in operations}
         self._gateway = gateway
         self._knowledge = knowledge
@@ -66,6 +75,12 @@ class AgentToolbox:
         self._question: str | None = None
         self._tool_limit_reached = False
         self._output_bytes_left = MAX_TOOL_OUTPUT_TOTAL
+        self._read_results: dict[tuple[str, str], ToolResult] = {}
+
+    @property
+    def awaits_confirmation(self) -> bool:
+        """Si una escritura dejó una propuesta que la persona tiene que confirmar."""
+        return self._pending is not None
 
     async def invoke(self, name: str, arguments: JsonObject) -> ToolResult:
         # Un lote del modelo puede contener varias escrituras que compitan por confirmar.
@@ -83,7 +98,10 @@ class AgentToolbox:
         if self._question is not None:
             return AgentOutcome("needs_clarification", self._question, calls)
         if self._tool_limit_reached or limit:
-            return AgentOutcome("limit_reached", limit or TOOL_LIMIT_MESSAGE, calls)
+            message = limit or TOOL_LIMIT_MESSAGE
+            if self._language == "en":
+                message = ENGLISH_LIMITS.get(message, message)
+            return AgentOutcome("limit_reached", message, calls)
         return AgentOutcome("answered", answer, calls)
 
     async def _invoke(self, name: str, arguments: JsonObject) -> ToolResult:
@@ -110,16 +128,28 @@ class AgentToolbox:
     ) -> ToolResult:
         try:
             if operation.level is OperationLevel.READ:
+                key = (operation.name, json.dumps(arguments, sort_keys=True))
+                cached = self._read_results.get(key)
+                if cached is not None:
+                    return cached
                 value = await self._gateway.execute(
                     self._identity, operation.name, arguments
                 )
-                return ToolResult("succeeded", self._encode(value))
+                result = ToolResult("succeeded", self._encode(value))
+                self._read_results[key] = result
+                return result
 
-            summary = await self._gateway.prepare(
+            preparation = await self._gateway.prepare(
                 self._identity, operation.name, arguments
             )
-            self._pending = PendingConfirmation(operation.name, arguments, summary)
-            return ToolResult("prepared", summary)
+            if preparation.applied:
+                # Nest ya la aplicó: el modelo sigue con el resultado.
+                applied = {"applied": preparation.summary, "result": preparation.result}
+                return ToolResult("succeeded", self._encode(applied))
+            self._pending = PendingConfirmation(
+                operation.name, arguments, preparation.summary
+            )
+            return ToolResult("prepared", preparation.summary)
         except OperationFailedError as error:
             return ToolResult("failed", self._bound_output(str(error)))
 
@@ -127,6 +157,14 @@ class AgentToolbox:
         query = _single_text_argument(arguments, "query")
         if query is None:
             return ToolResult("rejected", "Indica una consulta válida.")
+        if self._knowledge is None:
+            try:
+                value = await self._gateway.execute(
+                    self._identity, SEARCH_KNOWLEDGE, {"query": query}
+                )
+            except OperationFailedError as error:
+                return ToolResult("failed", self._bound_output(str(error)))
+            return ToolResult("succeeded", self._encode(value))
         search = SearchKnowledgeInput(
             scope=self._identity.scope,
             query=query,

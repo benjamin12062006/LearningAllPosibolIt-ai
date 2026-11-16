@@ -69,6 +69,24 @@ class AgentContextRequest(_Strict):
     worksheet_id: UUID | None = Field(default=None, alias="worksheetId")
     revision_id: UUID | None = Field(default=None, alias="revisionId")
     selection_id: UUID | None = Field(default=None, alias="selectionId")
+    section: (
+        Literal[
+            "project",
+            "catalog",
+            "rules",
+            "evaluations",
+            "products",
+            "feed",
+            "worksheets",
+            "integrations",
+            "chats",
+        ]
+        | None
+    ) = None
+    catalog_snapshot_id: UUID | None = Field(default=None, alias="catalogSnapshotId")
+    evaluation_id: UUID | None = Field(default=None, alias="evaluationId")
+    ruleset_revision: int | None = Field(default=None, alias="rulesetRevision", ge=1)
+    language: Literal["en", "es"] | None = None
 
     def to_domain(self) -> RunContext:
         def text(value: UUID | None) -> str | None:
@@ -79,6 +97,11 @@ class AgentContextRequest(_Strict):
             text(self.worksheet_id),
             text(self.revision_id),
             text(self.selection_id),
+            self.section,
+            text(self.catalog_snapshot_id),
+            text(self.evaluation_id),
+            self.ruleset_revision,
+            self.language,
         )
 
 

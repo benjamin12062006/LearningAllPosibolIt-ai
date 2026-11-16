@@ -8,7 +8,11 @@ from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.llms.mock import MockFunctionCallingLLM
 
 from ktsu_ai.application.agent_application.agent_service import AgentService
-from ktsu_ai.application.agent_ports.out_operation_gateway import OperationFailedError
+from ktsu_ai.application.agent_application.agent_toolbox import MAX_TOOL_CALLS
+from ktsu_ai.application.agent_ports.out_operation_gateway import (
+    OperationFailedError,
+    Preparation,
+)
 from ktsu_ai.domain.access.access_scope import AccessScope
 from ktsu_ai.domain.agent.agent_outcome import AgentOutcome
 from ktsu_ai.domain.agent.agent_run import (
@@ -20,7 +24,10 @@ from ktsu_ai.domain.agent.agent_run import (
     OperationLevel,
     RunIdentity,
 )
-from ktsu_ai.infrastructure.agent_infrastructure.llamaindex_agent import LlamaIndexAgent
+from ktsu_ai.infrastructure.agent_infrastructure.llamaindex_agent import (
+    MAX_MODEL_TURNS,
+    LlamaIndexAgent,
+)
 from tests.http.test_knowledge_routes import FakeKnowledge
 from tests.support.scripted_llm import ScriptedResponses, tool_call
 
@@ -52,6 +59,8 @@ class Gateway:
         self.calls: list[tuple[str, RunIdentity, str, JsonObject]] = []
         self.result: JsonValue = {"rows": 4}
         self.error: str | None = None
+        self.applies = False
+        self.applied_result: JsonValue = None
 
     async def execute(
         self, identity: RunIdentity, operation: str, arguments: JsonObject
@@ -63,11 +72,11 @@ class Gateway:
 
     async def prepare(
         self, identity: RunIdentity, operation: str, arguments: JsonObject
-    ) -> str:
+    ) -> Preparation:
         self.calls.append(("prepare", identity, operation, arguments))
         if self.error:
             raise OperationFailedError(self.error)
-        return SUMMARY
+        return Preparation(SUMMARY, self.applies, self.applied_result)
 
 
 def test_read_uses_nest_identity_and_model_receives_result_and_exact_schema() -> None:
@@ -106,6 +115,28 @@ def test_a_batch_of_writes_prepares_one_and_returns_the_nest_summary() -> None:
     assert outcome.confirmation.arguments == gateway.calls[0][3]
     assert sorted(call.status for call in outcome.calls) == ["prepared", "rejected"]
     assert len(scripted.messages) == 1
+
+
+def test_writes_applied_by_nest_let_the_run_chain_several_changes() -> None:
+    gateway = Gateway()
+    gateway.applies = True
+    gateway.applied_result = {"revisionId": "r3"}
+    scripted = ScriptedResponses(
+        tool_call("rename_sheet", limit=1),
+        tool_call("rename_sheet", limit=2),
+        ChatMessage(role="assistant", content="Listo: dos cambios aplicados."),
+    )
+    service = AgentService(LlamaIndexAgent(scripted.llm), gateway, FakeKnowledge())
+
+    outcome = asyncio.run(service.run(RUN))
+
+    assert outcome.status == "answered"
+    assert outcome.confirmation is None
+    assert [call.status for call in outcome.calls] == ["succeeded", "succeeded"]
+    assert [call[0] for call in gateway.calls] == ["prepare", "prepare"]
+    assert any(
+        '"revisionId": "r3"' in (msg.content or "") for msg in scripted.messages[-1]
+    )
 
 
 @pytest.mark.parametrize(
@@ -181,7 +212,7 @@ def test_run_budgets_include_unknown_tools_and_limit_each_result() -> None:
     gateway.result = "ü" * 18_000
     scripted = ScriptedResponses(
         tool_call("list_rows", limit=1),
-        *(tool_call("unknown") for _ in range(7)),
+        *(tool_call("unknown") for _ in range(MAX_TOOL_CALLS - 1)),
         tool_call("list_rows", limit=1),
         ChatMessage(role="assistant", content="Listo."),
     )
@@ -190,13 +221,13 @@ def test_run_budgets_include_unknown_tools_and_limit_each_result() -> None:
     outcome = asyncio.run(service.run(RUN))
 
     assert outcome.status == "limit_reached"
-    assert len(outcome.calls) == 9
+    assert len(outcome.calls) == MAX_TOOL_CALLS + 1
     assert len(gateway.calls) == 1
     tool_result = next(msg for msg in scripted.messages[1] if msg.role == "tool")
     assert len(tool_result.content) == 16_000
 
 
-def test_model_cannot_run_more_than_ten_turns() -> None:
+def test_model_cannot_run_more_than_the_turn_budget() -> None:
     calls = 0
 
     def always_calls(*args: object, **kwargs: object) -> ChatMessage:
@@ -210,7 +241,7 @@ def test_model_cannot_run_more_than_ten_turns() -> None:
     outcome = asyncio.run(service.run(RUN))
 
     assert outcome.status == "limit_reached"
-    assert calls == 10
+    assert calls == MAX_MODEL_TURNS
 
 
 def test_deadline_covers_workflow_execution(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -259,4 +290,4 @@ def test_system_prompt_names_the_run_context() -> None:
     prompt = system_prompt_for(RunContext(worksheet_id="h-1", selection_id="s-1"))
     assert "hoja h-1" in prompt
     assert "selección s-1" in prompt
-    assert "libro" not in prompt
+    assert "libro" not in prompt.removeprefix(SYSTEM_PROMPT)

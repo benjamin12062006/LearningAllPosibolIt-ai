@@ -74,9 +74,7 @@ def create_app(
     knowledge = build_knowledge_service(qdrant_client, embedder, configuration)
     agent = None
     if agent_llm is not None and nest_client is not None:
-        agent = build_agent_service(
-            agent_llm, nest_client, knowledge, qdrant_client, embedder, configuration
-        )
+        agent = build_agent_service(agent_llm, nest_client)
     services = ApiServices(
         health=build_health_service(qdrant_client),
         knowledge=knowledge,

@@ -11,7 +11,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from qdrant_client import AsyncQdrantClient
 
-from ktsu_ai.application.agent_ports.out_operation_gateway import OperationFailedError
+from ktsu_ai.application.agent_ports.out_operation_gateway import (
+    OperationFailedError,
+    Preparation,
+)
 from ktsu_ai.application.knowledge_application.dto_input_replace_source_input import (
     ReplaceSourceInput,
 )
@@ -169,10 +172,10 @@ class EvaluationGateway:
 
     async def prepare(
         self, identity: RunIdentity, operation: str, arguments: JsonObject
-    ) -> str:
+    ) -> Preparation:
         reply = self._reply(identity, OperationCall("prepare", operation, arguments))
         assert reply.summary
-        return reply.summary
+        return Preparation(reply.summary)
 
     def _reply(self, identity: RunIdentity, call: OperationCall) -> GatewayReply:
         self.calls.append(call)

@@ -136,8 +136,8 @@ class EnvironmentVariables(BaseSettings):
     # Vacío: agente desactivado.
     chat_model: str = ""
     chat_location: str = "global"
-    chat_thinking_level: ThinkingLevel = "MEDIUM"
-    chat_max_output_tokens: int = 4_096
+    chat_thinking_level: ThinkingLevel = "HIGH"
+    chat_max_output_tokens: int = 65_536
     chat_timeout_seconds: int = 60
 
     @field_validator("nest_agent_base_url", mode="before")

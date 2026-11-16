@@ -9,7 +9,7 @@ from llama_index.core.llms.mock import MockFunctionCallingLLM
 from ktsu_ai.domain.agent.agent_run import JsonValue
 
 
-def tool_call(name: str, **arguments: JsonValue) -> ChatMessage:
+def tool_call(name: str, /, **arguments: JsonValue) -> ChatMessage:
     return ChatMessage(
         role="assistant",
         blocks=[

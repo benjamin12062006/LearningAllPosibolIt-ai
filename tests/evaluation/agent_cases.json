@@ -267,7 +267,7 @@
         {"mode": "execute", "operation": "get_sheet_rows", "arguments": {"sheetId": "inventario"}, "result": {"count": 2}}
       ],
       "script": [
-        {"tool": "get_sheet_rows", "arguments": {"sheetId": "inventario"}, "repeat": 9},
+        {"tool": "get_sheet_rows", "arguments": {"sheetId": "inventario"}, "repeat": 21},
         {"text": "El inventario tiene 2 filas."}
       ],
       "expected": {
@@ -281,9 +281,21 @@
           {"operation": "get_sheet_rows", "status": "succeeded"},
           {"operation": "get_sheet_rows", "status": "succeeded"},
           {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
           {"operation": "get_sheet_rows", "status": "rejected"}
         ],
-        "gateway_calls": [0, 0, 0, 0, 0, 0, 0, 0],
+        "gateway_calls": [0],
         "answer_contains": ["límite de llamadas"],
         "tool_output_contains": ["límite de llamadas"]
       }
