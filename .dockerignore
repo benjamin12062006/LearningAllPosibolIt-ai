@@ -1,0 +1,33 @@
+# Lo que no entra al contexto de `docker build` (deploys, plan 02, regla 1).
+# El build solo necesita: pyproject.toml, uv.lock, README.md y src/.
+
+# Git, editor y sistema
+.git
+.gitignore
+.idea
+.DS_Store
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+
+# Entornos y cachés locales
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.import_linter_cache
+.cache
+
+# Lo que no forma parte de la imagen
+tests
+docs
+bitacora-construccion
+scripts
+Makefile
+Dockerfile
+.dockerignore
+.gcloudignore
