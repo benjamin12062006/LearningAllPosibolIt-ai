@@ -44,6 +44,9 @@ class RunIdentity:
 class HistoryMessage:
     role: Literal["user", "assistant"]
     content: str
+    # Lo que hizo la ejecución que respondió este mensaje: sus llamadas con los
+    # IDs que tocaron y la propuesta con su estado. Solo en los del asistente.
+    activity: JsonObject | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +71,10 @@ class AgentRun:
     history: tuple[HistoryMessage, ...]
     operations: tuple[AgentOperation, ...]
     context: RunContext = field(default_factory=RunContext)
+    # Mensajes anteriores que Nest no mandó porque no cabían.
+    omitted_messages: int = 0
+    # La ficha del proyecto que arma Nest en cada ejecución (plan 10 de Nest, D5).
+    project: JsonObject | None = None
 
     def __post_init__(self) -> None:
         names: set[str] = set()

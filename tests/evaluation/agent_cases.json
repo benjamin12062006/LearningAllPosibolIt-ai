@@ -105,7 +105,7 @@
         "calls": [{"operation": "preview_column_mapping", "status": "succeeded"}],
         "gateway_calls": [0],
         "answer_contains": ["precio_lista", "válido"],
-        "tool_output_contains": ["precio_lista", "\"valid\": true"]
+        "tool_output_contains": ["precio_lista", "valid: true"]
       }
     },
     {
@@ -267,12 +267,32 @@
         {"mode": "execute", "operation": "get_sheet_rows", "arguments": {"sheetId": "inventario"}, "result": {"count": 2}}
       ],
       "script": [
-        {"tool": "get_sheet_rows", "arguments": {"sheetId": "inventario"}, "repeat": 21},
+        {"tool": "get_sheet_rows", "arguments": {"sheetId": "inventario"}, "repeat": 41},
         {"text": "El inventario tiene 2 filas."}
       ],
       "expected": {
         "status": "limit_reached",
         "calls": [
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
+          {"operation": "get_sheet_rows", "status": "succeeded"},
           {"operation": "get_sheet_rows", "status": "succeeded"},
           {"operation": "get_sheet_rows", "status": "succeeded"},
           {"operation": "get_sheet_rows", "status": "succeeded"},

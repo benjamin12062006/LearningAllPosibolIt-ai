@@ -158,16 +158,17 @@ def test_chat_model_gets_its_own_location_and_safe_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("AI_SERVICE_TOKEN", VALID_TOKEN)
-    monkeypatch.setenv("CHAT_MODEL", "gemini-3.5-flash-lite")
+    monkeypatch.setenv("CHAT_MODEL", "gemini-3.5-flash")
     monkeypatch.setenv("NEST_AGENT_BASE_URL", "http://127.0.0.1:8080")
 
     chat = load_configuration(env_file=None).chat
 
     assert chat is not None
-    assert chat.model == "gemini-3.5-flash-lite"
+    assert chat.model == "gemini-3.5-flash"
     # No `us-central1` (la de los embeddings): ahí el modelo responde 404.
     assert chat.location == "global"
-    assert chat.thinking_level == "HIGH"
+    # El de Gemini 3.5 Flash: con HIGH, las tareas largas agotaban el plazo.
+    assert chat.thinking_level == "MEDIUM"
     assert chat.max_output_tokens == 65_536
     assert chat.timeout_seconds == 60
     assert chat.google_cloud_project == "estadistica-forms-api"

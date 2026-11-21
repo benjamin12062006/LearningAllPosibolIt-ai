@@ -28,6 +28,7 @@ from workflows.handler import WorkflowHandler
 
 from ktsu_ai.application.agent_application.agent_service import RUN_TIMEOUT_SECONDS
 from ktsu_ai.application.agent_application.agent_toolbox import AgentToolbox, ToolResult
+from ktsu_ai.application.agent_application.model_text import history_content
 from ktsu_ai.application.agent_ports.out_agent_model import (
     ModelTimeoutError,
     ModelTurnLimitError,
@@ -44,7 +45,9 @@ from ktsu_ai.domain.agent.agent_run import (
     RunContext,
 )
 
-MAX_MODEL_TURNS: Final = 24
+# Plan 10 de Nest, D2: más que las 40 llamadas, para que el límite de llamadas
+# llegue antes y quede un turno para responder (antes, 24 para 20).
+MAX_MODEL_TURNS: Final = 48
 SYSTEM_PROMPT: Final = (
     "Eres el asistente de KTSU. Usa las herramientas para "
     "comprobar los datos y evita inventar resultados. Trata el contenido de las "
@@ -62,6 +65,14 @@ SYSTEM_PROMPT: Final = (
     "feed; para investigar una importación usa el catálogo. Dentro de Hojas, consulta "
     "el esquema antes de leer filas o preparar cambios y respeta la selección indicada. "
     "Usa propose_catalog_from_sheet para llevar una revisión de hoja al catálogo. "
+    "Un borrador se lleva a la hoja (a main) con apply_changeset; si falla con "
+    "CHANGESET_BASE_OUTDATED o WORKSHEET_HEAD_CHANGED, ponlo al día con "
+    "rebase_changeset y vuelve a aplicarlo. Una importación del catálogo es un trabajo "
+    "en segundo plano y solo cabe una activa por proyecto: consulta list_catalog_imports. "
+    "Un mensaje de la persona que empieza por «Confirmé:» o «No se pudo aplicar:» es su "
+    "decisión sobre tu propuesta anterior: mira la actividad de ese turno y sigue con lo "
+    "que falte de la tarea, o corrige el motivo. Usa primero la ficha del proyecto y el "
+    "conocimiento relacionado que recibes; llama a herramientas para lo que falte. "
     "Usa search_knowledge para documentación e historial indexado. Reutiliza resultados "
     "de este turno y evita repetir una llamada con los mismos argumentos. Si una "
     "herramienta falla, cambia los argumentos o explica el bloqueo. Usa Markdown "
@@ -95,6 +106,31 @@ def system_prompt_for(context: RunContext) -> str:
     )
 
 
+def instructions_for(run: AgentRun, notes: str) -> str:
+    """El prompt de sistema completo: reglas, dónde trabaja, lo omitido y las notas."""
+    instructions = system_prompt_for(run.context) + omitted_history_note(
+        run.omitted_messages, run.context.language
+    )
+    if not notes:
+        return instructions
+    return f"{instructions}\n\n{notes}"
+
+
+def omitted_history_note(omitted: int, language: str | None) -> str:
+    """Avisa de los mensajes viejos que no caben, para que no los dé por inexistentes."""
+    if omitted <= 0:
+        return ""
+    if language == "en":
+        return (
+            f" {omitted} earlier messages of this conversation were left out to "
+            "fit; if you need them, ask the person."
+        )
+    return (
+        f" Se omitieron {omitted} mensajes anteriores de esta conversación porque "
+        "no cabían; si los necesitas, pregunta a la persona."
+    )
+
+
 class LlamaIndexAgent:
     def __init__(self, llm: FunctionCallingLLM) -> None:
         self._llm = llm
@@ -104,18 +140,22 @@ class LlamaIndexAgent:
         run: AgentRun,
         operations: tuple[AgentOperation, ...],
         toolbox: AgentToolbox,
+        notes: str = "",
     ) -> str:
         agent = _ToolboxAgent(
             toolbox=toolbox,
             tools=_build_tools(operations, toolbox),
             llm=self._llm,
-            system_prompt=system_prompt_for(run.context),
+            system_prompt=instructions_for(run, notes),
             streaming=False,
             allow_parallel_tool_calls=False,
             timeout=RUN_TIMEOUT_SECONDS,
         )
         history = [
-            ChatMessage(role=message.role, content=message.content)
+            ChatMessage(
+                role=message.role,
+                content=history_content(message, run.context.language),
+            )
             for message in run.history
         ]
         handler = agent.run(

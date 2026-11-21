@@ -151,7 +151,9 @@ class EnvironmentVariables(BaseSettings):
     # Vacío: agente desactivado.
     chat_model: str = ""
     chat_location: str = "global"
-    chat_thinking_level: ThinkingLevel = "HIGH"
+    # El valor por defecto de Gemini 3.5 Flash (ficha 12 de Nest, F1): con HIGH,
+    # las tareas largas agotaban el plazo.
+    chat_thinking_level: ThinkingLevel = "MEDIUM"
     chat_max_output_tokens: int = 65_536
     chat_timeout_seconds: int = 60
     # Federación OIDC en Vercel; vacíos fuera de Vercel. Nombres de la guía de Vercel.

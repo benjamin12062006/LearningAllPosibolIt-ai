@@ -8,7 +8,11 @@ from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.llms.mock import MockFunctionCallingLLM
 
 from ktsu_ai.application.agent_application.agent_service import AgentService
-from ktsu_ai.application.agent_application.agent_toolbox import MAX_TOOL_CALLS
+from ktsu_ai.application.agent_application.agent_toolbox import (
+    MAX_OUTPUT_BYTES_PER_RUN,
+    MAX_RESULT_BYTES,
+    MAX_TOOL_CALLS,
+)
 from ktsu_ai.application.agent_ports.out_operation_gateway import (
     OperationFailedError,
     Preparation,
@@ -22,6 +26,7 @@ from ktsu_ai.domain.agent.agent_run import (
     JsonObject,
     JsonValue,
     OperationLevel,
+    RunContext,
     RunIdentity,
 )
 from ktsu_ai.infrastructure.agent_infrastructure.llamaindex_agent import (
@@ -58,7 +63,7 @@ class Gateway:
     def __init__(self) -> None:
         self.calls: list[tuple[str, RunIdentity, str, JsonObject]] = []
         self.result: JsonValue = {"rows": 4}
-        self.error: str | None = None
+        self.error: str | OperationFailedError | None = None
         self.applies = False
         self.applied_result: JsonValue = None
 
@@ -67,7 +72,7 @@ class Gateway:
     ) -> JsonValue:
         self.calls.append(("execute", identity, operation, arguments))
         if self.error:
-            raise OperationFailedError(self.error)
+            raise failure(self.error)
         return self.result
 
     async def prepare(
@@ -75,8 +80,14 @@ class Gateway:
     ) -> Preparation:
         self.calls.append(("prepare", identity, operation, arguments))
         if self.error:
-            raise OperationFailedError(self.error)
+            raise failure(self.error)
         return Preparation(SUMMARY, self.applies, self.applied_result)
+
+
+def failure(error: str | OperationFailedError) -> OperationFailedError:
+    if isinstance(error, OperationFailedError):
+        return error
+    return OperationFailedError(error)
 
 
 def test_read_uses_nest_identity_and_model_receives_result_and_exact_schema() -> None:
@@ -93,7 +104,8 @@ def test_read_uses_nest_identity_and_model_receives_result_and_exact_schema() ->
     assert gateway.calls == [("execute", RUN.identity, "list_rows", {"limit": 5})]
     assert scripted.schemas[0]["function"]["parameters"] == READ.input_schema
     assert any(msg.content == "Pregunta anterior." for msg in scripted.messages[0])
-    assert any('"rows": 4' in (msg.content or "") for msg in scripted.messages[-1])
+    # En TOON, no en JSON (plan 10 de Nest, D3).
+    assert any("rows: 4" in (msg.content or "") for msg in scripted.messages[-1])
     assert "secret" not in repr(RUN.identity)
 
 
@@ -134,9 +146,7 @@ def test_writes_applied_by_nest_let_the_run_chain_several_changes() -> None:
     assert outcome.confirmation is None
     assert [call.status for call in outcome.calls] == ["succeeded", "succeeded"]
     assert [call[0] for call in gateway.calls] == ["prepare", "prepare"]
-    assert any(
-        '"revisionId": "r3"' in (msg.content or "") for msg in scripted.messages[-1]
-    )
+    assert any("revisionId: r3" in (msg.content or "") for msg in scripted.messages[-1])
 
 
 @pytest.mark.parametrize(
@@ -207,9 +217,8 @@ def test_untrusted_result_cannot_grant_another_tool_or_change_search_scope() -> 
     assert any("delete_project" in (msg.content or "") for msg in scripted.messages[1])
 
 
-def test_run_budgets_include_unknown_tools_and_limit_each_result() -> None:
+def test_run_budget_counts_unknown_tools() -> None:
     gateway = Gateway()
-    gateway.result = "ü" * 18_000
     scripted = ScriptedResponses(
         tool_call("list_rows", limit=1),
         *(tool_call("unknown") for _ in range(MAX_TOOL_CALLS - 1)),
@@ -223,8 +232,72 @@ def test_run_budgets_include_unknown_tools_and_limit_each_result() -> None:
     assert outcome.status == "limit_reached"
     assert len(outcome.calls) == MAX_TOOL_CALLS + 1
     assert len(gateway.calls) == 1
-    tool_result = next(msg for msg in scripted.messages[1] if msg.role == "tool")
-    assert len(tool_result.content) == 16_000
+
+
+def test_a_large_result_is_cut_at_a_line_and_says_so() -> None:
+    gateway = Gateway()
+    gateway.result = {
+        "items": [{"id": index, "text": "ü" * 200} for index in range(400)]
+    }
+    scripted = ScriptedResponses(
+        tool_call("list_rows", limit=1),
+        ChatMessage(role="assistant", content="Listo."),
+    )
+    service = AgentService(LlamaIndexAgent(scripted.llm), gateway, FakeKnowledge())
+
+    asyncio.run(service.run(RUN))
+
+    content = tool_output(scripted.messages[1])
+    kept, notice = content.rsplit("\n", 1)
+    assert len(content.encode()) <= MAX_RESULT_BYTES
+    assert notice.startswith("[Resultado recortado: se muestran ")
+    # Termina en una fila completa: la última línea es una fila entera de la tabla.
+    assert kept.splitlines()[-1].endswith("ü" * 200)
+
+
+def test_after_the_run_budget_results_say_so_instead_of_arriving_empty() -> None:
+    gateway = Gateway()
+    gateway.result = {
+        "items": [{"id": index, "text": "x" * 500} for index in range(200)]
+    }
+    # Las lecturas que llenan el turno, más una que ya no cabe.
+    reads = -(-MAX_OUTPUT_BYTES_PER_RUN // MAX_RESULT_BYTES) + 1
+    scripted = ScriptedResponses(
+        *(tool_call("list_rows", limit=index + 1) for index in range(reads)),
+        ChatMessage(role="assistant", content="Listo."),
+    )
+    service = AgentService(LlamaIndexAgent(scripted.llm), gateway, FakeKnowledge())
+
+    asyncio.run(service.run(RUN))
+
+    last = tool_output(scripted.messages[-1])
+    assert last.startswith("Se agotó el espacio para resultados de este turno.")
+
+
+def test_nest_rejections_reach_the_model_with_code_and_run_language() -> None:
+    gateway = Gateway()
+    gateway.error = OperationFailedError(
+        "El resultado es demasiado grande para el asistente.",
+        "AGENT_RESULT_TOO_LARGE",
+        "The result is too large for the assistant.",
+    )
+    english = replace(RUN, context=RunContext(language="en"))
+    scripted = ScriptedResponses(
+        tool_call("list_rows", limit=1),
+        ChatMessage(role="assistant", content="Done."),
+    )
+    service = AgentService(LlamaIndexAgent(scripted.llm), gateway, FakeKnowledge())
+
+    outcome = asyncio.run(service.run(english))
+
+    assert [call.status for call in outcome.calls] == ["failed"]
+    assert tool_output(scripted.messages[1]) == (
+        "AGENT_RESULT_TOO_LARGE: The result is too large for the assistant."
+    )
+
+
+def tool_output(messages: tuple[ChatMessage, ...]) -> str:
+    return next(msg for msg in reversed(messages) if msg.role == "tool").content or ""
 
 
 def test_model_cannot_run_more_than_the_turn_budget() -> None:
@@ -291,3 +364,53 @@ def test_system_prompt_names_the_run_context() -> None:
     assert "hoja h-1" in prompt
     assert "selección s-1" in prompt
     assert "libro" not in prompt.removeprefix(SYSTEM_PROMPT)
+
+
+def test_history_carries_each_turn_activity_in_toon_and_the_omitted_count() -> None:
+    activity: JsonObject = {
+        "calls": [
+            {
+                "operation": "prepare_sheet_edits",
+                "status": "succeeded",
+                "target": {"worksheetId": "h-1"},
+            }
+        ],
+        "proposal": {
+            "operation": "prepare_sheet_edits",
+            "status": "confirmed",
+            "result": {"changesetId": "c-9"},
+        },
+    }
+    run = replace(
+        RUN,
+        history=(
+            HistoryMessage("user", "Borra los duplicados."),
+            HistoryMessage("assistant", "Preparé el borrador.", activity),
+        ),
+        omitted_messages=3,
+    )
+    scripted = ScriptedResponses(ChatMessage(role="assistant", content="Hecho."))
+    service = AgentService(LlamaIndexAgent(scripted.llm), Gateway(), FakeKnowledge())
+
+    asyncio.run(service.run(run))
+
+    sent = scripted.messages[0]
+    user = next(msg for msg in sent if msg.content == "Borra los duplicados.")
+    assistant = next(
+        msg for msg in sent if (msg.content or "").startswith("Preparé el borrador.")
+    )
+    assert user.role == "user"
+    assert "Actividad de este turno registrada por KTSU" in (assistant.content or "")
+    assert "changesetId: c-9" in (assistant.content or "")
+    assert "status: confirmed" in (assistant.content or "")
+    system = sent[0].content or ""
+    assert "Se omitieron 3 mensajes anteriores" in system
+
+
+def test_without_omitted_messages_the_prompt_does_not_mention_them() -> None:
+    scripted = ScriptedResponses(ChatMessage(role="assistant", content="Hola."))
+    service = AgentService(LlamaIndexAgent(scripted.llm), Gateway(), FakeKnowledge())
+
+    asyncio.run(service.run(RUN))
+
+    assert "Se omitieron" not in (scripted.messages[0][0].content or "")

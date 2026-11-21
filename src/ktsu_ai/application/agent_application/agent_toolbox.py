@@ -3,9 +3,10 @@
 import asyncio
 import json
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Final
 
+from ktsu_ai.application.agent_application.model_text import to_model_text
 from ktsu_ai.application.agent_ports.out_operation_gateway import (
     IOperationGateway,
     OperationFailedError,
@@ -27,12 +28,20 @@ from ktsu_ai.domain.agent.agent_run import (
     AgentOperation,
     AgentRun,
     JsonObject,
+    JsonValue,
     OperationLevel,
 )
+from ktsu_ai.domain.knowledge.knowledge_document import KnowledgeHit
 
-MAX_TOOL_CALLS: Final = 20
-MAX_TOOL_OUTPUT_LENGTH: Final = 16_000
-MAX_TOOL_OUTPUT_TOTAL: Final = 64 * 1024
+# Tiene que coincidir con `AGENT_RUN_LIMITS.calls` de Nest (plan 10, D2).
+MAX_TOOL_CALLS: Final = 40
+# Igual que `readResultBytes` de Nest: una lectura más grande ya es un 422 allí.
+MAX_RESULT_BYTES: Final = 60 * 1024
+MAX_OUTPUT_BYTES_PER_RUN: Final = 512 * 1024
+# Lo que se aparta para el aviso de recorte.
+NOTICE_RESERVE_BYTES: Final = 256
+# Por debajo de esto, recortar ya no deja nada útil que leer.
+MIN_USEFUL_BYTES: Final = 1024
 KNOWLEDGE_RESULTS: Final = 8
 MAX_QUERY_LENGTH: Final = 1_000
 TOOL_LIMIT_MESSAGE: Final = (
@@ -45,6 +54,18 @@ ENGLISH_LIMITS: Final = {
     TOOL_LIMIT_MESSAGE: "This turn reached its tool call limit. You can continue in another message.",
     TIME_LIMIT_MESSAGE: "The assistant ran out of time.",
     MODEL_LIMIT_MESSAGE: "The assistant reached its turn limit.",
+}
+TRUNCATED_NOTICE: Final = {
+    "es": "[Resultado recortado: se muestran {shown} de {total} caracteres. "
+    "Pide menos filas o columnas, o la página siguiente.]",
+    "en": "[Result truncated: showing {shown} of {total} characters. "
+    "Ask for fewer rows or columns, or for the next page.]",
+}
+BUDGET_EXHAUSTED: Final = {
+    "es": "Se agotó el espacio para resultados de este turno. Responde con lo "
+    "que ya tienes; la persona puede pedirte que continúes.",
+    "en": "This turn has no room left for tool results. Answer with what you "
+    "have; the person can ask you to continue.",
 }
 
 
@@ -74,7 +95,7 @@ class AgentToolbox:
         self._pending: PendingConfirmation | None = None
         self._question: str | None = None
         self._tool_limit_reached = False
-        self._output_bytes_left = MAX_TOOL_OUTPUT_TOTAL
+        self._output_bytes_left = MAX_OUTPUT_BYTES_PER_RUN
         self._read_results: dict[tuple[str, str], ToolResult] = {}
 
     @property
@@ -135,7 +156,7 @@ class AgentToolbox:
                 value = await self._gateway.execute(
                     self._identity, operation.name, arguments
                 )
-                result = ToolResult("succeeded", self._encode(value))
+                result = ToolResult("succeeded", self._for_model(value))
                 self._read_results[key] = result
                 return result
 
@@ -145,13 +166,13 @@ class AgentToolbox:
             if preparation.applied:
                 # Nest ya la aplicó: el modelo sigue con el resultado.
                 applied = {"applied": preparation.summary, "result": preparation.result}
-                return ToolResult("succeeded", self._encode(applied))
+                return ToolResult("succeeded", self._for_model(applied))
             self._pending = PendingConfirmation(
                 operation.name, arguments, preparation.summary
             )
             return ToolResult("prepared", preparation.summary)
         except OperationFailedError as error:
-            return ToolResult("failed", self._bound_output(str(error)))
+            return ToolResult("failed", self._fit(error.for_model(self._language)))
 
     async def _search(self, arguments: JsonObject) -> ToolResult:
         query = _single_text_argument(arguments, "query")
@@ -163,8 +184,8 @@ class AgentToolbox:
                     self._identity, SEARCH_KNOWLEDGE, {"query": query}
                 )
             except OperationFailedError as error:
-                return ToolResult("failed", self._bound_output(str(error)))
-            return ToolResult("succeeded", self._encode(value))
+                return ToolResult("failed", self._fit(error.for_model(self._language)))
+            return ToolResult("succeeded", self._for_model(value))
         search = SearchKnowledgeInput(
             scope=self._identity.scope,
             query=query,
@@ -174,10 +195,12 @@ class AgentToolbox:
         try:
             output = await self._knowledge.search(search)
         except AppError as error:
-            return ToolResult("failed", self._bound_output(error.definition.message.es))
-        return ToolResult(
-            "succeeded", self._encode([asdict(hit) for hit in output.hits])
-        )
+            message = error.definition.message
+            return ToolResult(
+                "failed",
+                self._fit(self._in_language({"es": message.es, "en": message.en})),
+            )
+        return ToolResult("succeeded", self._for_model(knowledge_rows(output.hits)))
 
     def _clarify(self, arguments: JsonObject) -> ToolResult:
         question = _single_text_argument(arguments, "question")
@@ -186,14 +209,54 @@ class AgentToolbox:
         self._question = question
         return ToolResult("succeeded", question)
 
-    def _encode(self, value: object) -> str:
-        return self._bound_output(json.dumps(value, ensure_ascii=False))
+    def _for_model(self, value: JsonValue) -> str:
+        return self._fit(to_model_text(value))
 
-    def _bound_output(self, content: str) -> str:
-        limited = content[:MAX_TOOL_OUTPUT_LENGTH].encode()
-        limited = limited[: self._output_bytes_left]
-        self._output_bytes_left -= len(limited)
-        return limited.decode(errors="ignore")
+    def _fit(self, content: str) -> str:
+        """Lo que cabe en un resultado y en lo que queda del turno.
+
+        Recorta por líneas, para no dejar una fila a medias, y lo avisa. Nunca
+        devuelve un texto vacío: el modelo tiene que saber qué pasó (ficha 12, E9).
+        """
+        allowance = min(MAX_RESULT_BYTES, self._output_bytes_left)
+        encoded = content.encode()
+        if len(encoded) <= allowance:
+            self._output_bytes_left -= len(encoded)
+            return content
+        if allowance - NOTICE_RESERVE_BYTES < MIN_USEFUL_BYTES:
+            return self._in_language(BUDGET_EXHAUSTED)
+
+        kept = _cut_at_line(encoded, allowance - NOTICE_RESERVE_BYTES)
+        notice = self._in_language(TRUNCATED_NOTICE).format(
+            shown=len(kept), total=len(content)
+        )
+        fitted = f"{kept}\n{notice}"
+        self._output_bytes_left -= len(fitted.encode())
+        return fitted
+
+    def _in_language(self, messages: dict[str, str]) -> str:
+        return messages["en"] if self._language == "en" else messages["es"]
+
+
+def knowledge_rows(hits: tuple[KnowledgeHit, ...]) -> list[JsonValue]:
+    """Cada resultado con lo que sirve para citarlo, en filas iguales para TOON."""
+    return [
+        {
+            "sourceType": hit.key.source_type,
+            "sourceId": hit.key.source_id,
+            "score": round(hit.score, 3),
+            "text": hit.text,
+        }
+        for hit in hits
+    ]
+
+
+def _cut_at_line(encoded: bytes, limit: int) -> str:
+    text = encoded[:limit].decode(errors="ignore")
+    last_line_end = text.rfind("\n")
+    if last_line_end > 0:
+        return text[:last_line_end]
+    return text
 
 
 def _single_text_argument(arguments: JsonObject, name: str) -> str | None:

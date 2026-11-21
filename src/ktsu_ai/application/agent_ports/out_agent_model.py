@@ -20,7 +20,10 @@ class IAgentModel(Protocol):
         run: AgentRun,
         operations: tuple[AgentOperation, ...],
         toolbox: AgentToolbox,
-    ) -> str: ...
+        notes: str = "",
+    ) -> str:
+        """`notes`: ficha del proyecto y conocimiento relacionado, ya en texto."""
+        ...
 
 
 class IOperationSelector(Protocol):
