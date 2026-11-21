@@ -34,6 +34,10 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "CHAT_THINKING_LEVEL",
         "CHAT_MAX_OUTPUT_TOKENS",
         "CHAT_TIMEOUT_SECONDS",
+        "GCP_PROJECT_NUMBER",
+        "GCP_WORKLOAD_IDENTITY_POOL_ID",
+        "GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID",
+        "GCP_SERVICE_ACCOUNT_EMAIL",
     ):
         monkeypatch.delenv(name, raising=False)
 

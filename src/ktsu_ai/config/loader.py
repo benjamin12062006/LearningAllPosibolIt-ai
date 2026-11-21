@@ -8,6 +8,7 @@ from ktsu_ai.config.configuration import (
     Configuration,
     EmbeddingConfiguration,
     EnvironmentVariables,
+    GoogleFederationConfiguration,
     KnowledgeConfiguration,
     QdrantConfiguration,
     ServerConfiguration,
@@ -42,6 +43,22 @@ def load_configuration(env_file: str | None = ".env") -> Configuration:
         nest_agent_base_url=variables.nest_agent_base_url,
         agent_tools_collection=variables.agent_tools_collection,
         chat=_chat_model(variables),
+        google_federation=_google_federation(variables),
+    )
+
+
+def _google_federation(
+    variables: EnvironmentVariables,
+) -> GoogleFederationConfiguration | None:
+    """Sin `GCP_PROJECT_NUMBER`, Google usa las credenciales de la cuenta (ADC)."""
+    project_number = variables.gcp_project_number.strip()
+    if project_number == "":
+        return None
+    return GoogleFederationConfiguration(
+        project_number=project_number,
+        pool_id=variables.gcp_workload_identity_pool_id.strip(),
+        provider_id=variables.gcp_workload_identity_pool_provider_id.strip(),
+        service_account_email=variables.gcp_service_account_email.strip(),
     )
 
 

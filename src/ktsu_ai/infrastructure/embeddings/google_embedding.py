@@ -1,10 +1,11 @@
 """Embeddings de Google por Vertex AI (plan E6, D5): ningún modelo propio ni local.
 
-Credenciales: las de la cuenta (ADC) en local y la cuenta de servicio en Cloud
-Run; no hay clave de API. El conector de LlamaIndex ya usa `RETRIEVAL_DOCUMENT`
-al indexar y `RETRIEVAL_QUERY` al preguntar.
+Credenciales: las de la cuenta (ADC) en local y la cuenta de servicio en GKE; en
+Vercel, las de la federación OIDC. No hay clave de API. El conector de LlamaIndex
+ya usa `RETRIEVAL_DOCUMENT` al indexar y `RETRIEVAL_QUERY` al preguntar.
 """
 
+from google.auth.credentials import Credentials
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
 from llama_index.embeddings.google_genai.base import VertexAIConfig
@@ -12,13 +13,15 @@ from llama_index.embeddings.google_genai.base import VertexAIConfig
 from ktsu_ai.config.configuration import EmbeddingConfiguration
 
 
-def create_google_embedding(config: EmbeddingConfiguration) -> BaseEmbedding:
+def create_google_embedding(
+    config: EmbeddingConfiguration, credentials: Credentials | None = None
+) -> BaseEmbedding:
     return GoogleGenAIEmbedding(
         model_name=config.model,
         vertexai_config=VertexAIConfig(
             # Sin credenciales explícitas: las de la cuenta (ADC). Con Vertex, el
             # conector descarta cualquier GOOGLE_API_KEY del entorno.
-            credentials=None,
+            credentials=credentials,
             project=config.google_cloud_project,
             location=config.google_cloud_location,
         ),

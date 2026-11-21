@@ -5,14 +5,14 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from google.auth.credentials import AnonymousCredentials
+from google.auth.credentials import AnonymousCredentials, Credentials
 from google.genai import types
 from llama_index.core.base.llms.types import ChatMessage
 from llama_index.core.llms.function_calling import FunctionCallingLLM
 from qdrant_client import AsyncQdrantClient
 
 from ktsu_ai.bootstrap.app import create_app_from_environment
-from ktsu_ai.config.configuration import ChatModelConfiguration
+from ktsu_ai.config.configuration import ChatModelConfiguration, EmbeddingConfiguration
 from ktsu_ai.domain.agent.agent_run import AgentOperation, OperationLevel
 from ktsu_ai.infrastructure.agent_infrastructure.gemini_chat_model import (
     GEMINI_CONTEXT_WINDOW,
@@ -193,15 +193,25 @@ def _start_from_environment(
 
     created: list[ChatModelConfiguration] = []
 
-    def scripted_gemini(config: ChatModelConfiguration) -> FunctionCallingLLM:
+    def scripted_gemini(
+        config: ChatModelConfiguration, credentials: Credentials | None
+    ) -> FunctionCallingLLM:
+        # Fuera de Vercel no hay federación: Google usa las credenciales de la cuenta.
+        assert credentials is None
         created.append(config)
         return ScriptedResponses(ChatMessage(role="assistant", content="Hola.")).llm
+
+    def word_hash_embedding(
+        config: EmbeddingConfiguration, credentials: Credentials | None
+    ) -> WordHashEmbedding:
+        assert credentials is None
+        return embedder
 
     monkeypatch.setattr(
         "ktsu_ai.bootstrap.app.create_gemini_chat_model", scripted_gemini
     )
     monkeypatch.setattr(
-        "ktsu_ai.bootstrap.app.create_google_embedding", lambda config: embedder
+        "ktsu_ai.bootstrap.app.create_google_embedding", word_hash_embedding
     )
     monkeypatch.setattr(
         "ktsu_ai.bootstrap.app.create_client",

@@ -74,6 +74,19 @@ class ChatModelConfiguration(BaseModel):
     google_cloud_project: str = Field(min_length=1)
 
 
+class GoogleFederationConfiguration(BaseModel):
+    """Federación OIDC de Vercel con Google Cloud (deploys, bitácora 07).
+
+    Solo en Vercel: allí no hay cuenta de servicio en el entorno, y Google cambia
+    el token OIDC de Vercel por un acceso temporal de la cuenta indicada.
+    """
+
+    project_number: str = Field(pattern=r"^\d+$")
+    pool_id: str = Field(min_length=1)
+    provider_id: str = Field(min_length=1)
+    service_account_email: str = Field(pattern=r"^[^@\s]+@[^@\s]+$")
+
+
 CollectionName = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 
 
@@ -91,6 +104,8 @@ class Configuration(BaseModel):
     agent_tools_collection: CollectionName = "ktsu_agent_tools"
     # Sin modelo, el agente está desactivado y su ruta responde 503.
     chat: ChatModelConfiguration | None = None
+    # Sin federación, las credenciales de Google son las de la cuenta (ADC).
+    google_federation: GoogleFederationConfiguration | None = None
 
     @model_validator(mode="after")
     def _validate_distinct_collections(self) -> Self:
@@ -139,6 +154,11 @@ class EnvironmentVariables(BaseSettings):
     chat_thinking_level: ThinkingLevel = "HIGH"
     chat_max_output_tokens: int = 65_536
     chat_timeout_seconds: int = 60
+    # Federación OIDC en Vercel; vacíos fuera de Vercel. Nombres de la guía de Vercel.
+    gcp_project_number: str = ""
+    gcp_workload_identity_pool_id: str = ""
+    gcp_workload_identity_pool_provider_id: str = ""
+    gcp_service_account_email: str = ""
 
     @field_validator("nest_agent_base_url", mode="before")
     @classmethod

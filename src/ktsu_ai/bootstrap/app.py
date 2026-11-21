@@ -21,12 +21,17 @@ from ktsu_ai.config.configuration import Configuration
 from ktsu_ai.config.loader import load_configuration
 from ktsu_ai.http.http_server import serve
 from ktsu_ai.http.middleware.internal_auth import InternalAuth
+from ktsu_ai.http.middleware.vercel_oidc import RememberVercelOidcToken
 from ktsu_ai.http.routes import ApiServices, mount_routes
 from ktsu_ai.infrastructure.agent_infrastructure.gemini_chat_model import (
     create_gemini_chat_model,
 )
 from ktsu_ai.infrastructure.database.qdrant.connection import create_client
 from ktsu_ai.infrastructure.embeddings.google_embedding import create_google_embedding
+from ktsu_ai.infrastructure.google_credentials.vercel_federation import (
+    LatestVercelOidcToken,
+    create_vercel_federated_credentials,
+)
 
 
 def create_app(
@@ -98,12 +103,31 @@ def main() -> None:
 
 
 def _create_configured_app(configuration: Configuration) -> FastAPI:
-    """Con `CHAT_MODEL`, el agente usa Gemini; sin él, queda desactivado (503)."""
-    if configuration.chat is None:
-        return create_app(configuration)
-    return create_app(
-        configuration, agent_llm=create_gemini_chat_model(configuration.chat)
+    """Con `CHAT_MODEL`, el agente usa Gemini; sin él, queda desactivado (503).
+
+    En Vercel (`GCP_PROJECT_NUMBER`), Google se usa con la federación OIDC; en
+    local y en GKE, con las credenciales de la cuenta (ADC).
+    """
+    vercel_token = None
+    credentials = None
+    if configuration.google_federation is not None:
+        vercel_token = LatestVercelOidcToken()
+        credentials = create_vercel_federated_credentials(
+            configuration.google_federation, vercel_token
+        )
+
+    agent_llm = None
+    if configuration.chat is not None:
+        agent_llm = create_gemini_chat_model(configuration.chat, credentials)
+    app = create_app(
+        configuration,
+        create_google_embedding(configuration.embedding, credentials),
+        agent_llm=agent_llm,
     )
+
+    if vercel_token is not None:
+        app.add_middleware(RememberVercelOidcToken, remember=vercel_token.remember)
+    return app
 
 
 def _configure_logging(configuration: Configuration) -> None:
