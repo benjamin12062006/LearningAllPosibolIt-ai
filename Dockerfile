@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 #
-# Imagen del servicio de IA (deploys, plan 06, D12).
+# Imagen del servidor MCP HTTP (deploys, plan 07).
 #
-#   docker build -t ktsu-ai .
+#   docker build -t ktsu-mcp .
 #
 # Dos etapas: en `build` se crea el entorno virtual con uv; `runtime` solo copia
 # ese entorno. La imagen final no lleva uv, ni el código fuente suelto, ni las
@@ -46,13 +46,10 @@ RUN useradd --create-home --uid 10001 ktsu
 # Misma ruta que en `build`: el entorno virtual guarda rutas absolutas.
 COPY --from=build /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:${PATH}
-# En el contenedor se escucha en todas las interfaces (plan 02, fila FastAPI).
-ENV AI_SERVICE_HOST=0.0.0.0
-ENV AI_SERVICE_PORT=8090
 # Los registros salen en cuanto se escriben, sin esperar a llenar un búfer.
 ENV PYTHONUNBUFFERED=1
 WORKDIR /home/ktsu
 USER ktsu
-EXPOSE 8090
+EXPOSE 8091
 # Forma exec: el servicio es el proceso 1 y recibe el SIGTERM del orquestador.
-CMD ["ktsu-ai"]
+CMD ["sh", "-c", "exec uvicorn --factory ktsu_ai.bootstrap.mcp_http:create_app_from_environment --host 0.0.0.0 --port \"${PORT:-8091}\" --no-access-log"]

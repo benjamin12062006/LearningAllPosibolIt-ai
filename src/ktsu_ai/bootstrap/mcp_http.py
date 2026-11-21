@@ -8,7 +8,7 @@ from typing import Self
 import httpx
 import uvicorn
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from pydantic import HttpUrl, model_validator
+from pydantic import Field, HttpUrl, SecretStr, model_validator
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -34,6 +34,7 @@ MAX_BODY_BYTES = 64 * 1024
 class McpHttpSettings(McpGatewaySettings):
     mcp_resource_url: HttpUrl
     mcp_oauth_issuer: HttpUrl
+    nest_vercel_bypass_token: SecretStr | None = Field(default=None, min_length=16)
 
     @model_validator(mode="after")
     def validate_public_urls(self) -> Self:
@@ -50,6 +51,12 @@ class McpHttpSettings(McpGatewaySettings):
                 )
         if self.mcp_resource_url.path != MCP_PATH:
             raise ValueError("La URL pública debe terminar en /mcp.")
+        if self.nest_vercel_bypass_token is not None:
+            nest_host = self.nest_url.host or ""
+            if self.nest_url.scheme != "https" or not nest_host.endswith(".vercel.app"):
+                raise ValueError(
+                    "La credencial de Vercel requiere un origen HTTPS de Vercel."
+                )
         return self
 
 
@@ -67,8 +74,17 @@ def create_app(
     origin = resource.removesuffix(MCP_PATH)
     host = origin.removeprefix("https://")
     metadata_url = origin + METADATA_PATH
+    bypass_token = settings.nest_vercel_bypass_token
+    # El origen protegido de Nest acepta esta cabecera de servidor además de
+    # las credenciales que valida la pasarela con cada llamada MCP.
+    nest_headers = (
+        {"x-vercel-protection-bypass": bypass_token.get_secret_value()}
+        if bypass_token is not None
+        else None
+    )
     client = httpx.AsyncClient(
         base_url=str(settings.nest_url),
+        headers=nest_headers,
         timeout=REQUEST_TIMEOUT_SECONDS,
         follow_redirects=False,
         trust_env=False,

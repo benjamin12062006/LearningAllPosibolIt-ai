@@ -27,6 +27,7 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
         assert request.headers["X-Ktsu-Mcp-OAuth"] == "Bearer access-test"
         assert "X-Ktsu-Delegation" not in request.headers
         assert request.headers["Authorization"] == "Bearer " + "a" * 32
+        assert request.headers["x-vercel-protection-bypass"] == "protection-test-token"
         route = request.url.path.rsplit("/", 1)[1]
         calls.append(route)
         if revoked:
@@ -63,10 +64,11 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
 
     app = create_app(
         McpHttpSettings(
-            nest_url=HttpUrl("http://127.0.0.1:8080"),
+            nest_url=HttpUrl("https://nest-preview.vercel.app"),
             mcp_adapter_token=SecretStr("a" * 32),
             mcp_resource_url=HttpUrl(RESOURCE),
             mcp_oauth_issuer=HttpUrl(ISSUER),
+            nest_vercel_bypass_token=SecretStr("protection-test-token"),
         ),
         transport=httpx.MockTransport(nest),
     )
@@ -74,6 +76,7 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
         metadata = client.get("/.well-known/oauth-protected-resource/mcp")
         assert metadata.json()["authorization_servers"] == [ISSUER]
         assert metadata.json()["resource"] == RESOURCE
+        assert "protection-test-token" not in metadata.text
 
         request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
         absent = client.post("/mcp", json=request)
@@ -114,6 +117,7 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
 def test_el_sdk_http_mantiene_tokens_separados_entre_clientes() -> None:
     def nest(request: httpx.Request) -> httpx.Response:
         authorization = request.headers["X-Ktsu-Mcp-OAuth"]
+        assert "x-vercel-protection-bypass" not in request.headers
         route = request.url.path.rsplit("/", 1)[1]
         if route == "session":
             return httpx.Response(200, json={})
