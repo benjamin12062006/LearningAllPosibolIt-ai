@@ -1,5 +1,6 @@
 """Contrato HTTP interno de una ejecución del agente."""
 
+import json
 import re
 from typing import Final, Literal
 from uuid import UUID
@@ -60,6 +61,15 @@ class AgentOperationRequest(_Strict):
 class AgentHistoryRequest(_Strict):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=16_000)
+    activity: JsonObject | None = None
+
+    @field_validator("activity")
+    @classmethod
+    def validate_activity_size(cls, activity: JsonObject | None) -> JsonObject | None:
+        # Nest acota el historial entero; esto solo frena un cuerpo anómalo.
+        if activity is not None and len(json.dumps(activity)) > MAX_ACTIVITY_BYTES:
+            raise ValueError("La actividad de un mensaje es demasiado grande.")
+        return activity
 
 
 class AgentContextRequest(_Strict):
@@ -106,6 +116,8 @@ class AgentContextRequest(_Strict):
 
 
 TOKEN_PATTERN: Final = re.compile(r"[A-Za-z0-9._~+/-]{1,8192}={0,2}")
+MAX_ACTIVITY_BYTES: Final = 64 * 1024
+MAX_PROJECT_BYTES: Final = 128 * 1024
 
 
 class AgentRunRequest(_Strict):
@@ -113,7 +125,19 @@ class AgentRunRequest(_Strict):
     scope: AgentScopeRequest
     credential: SecretStr
     message: str = Field(min_length=1, max_length=16_000)
-    history: list[AgentHistoryRequest] = Field(default_factory=list, max_length=50)
+    # Igual que `AGENT_RUN_LIMITS.historyMessages` de Nest (plan 10, D2).
+    history: list[AgentHistoryRequest] = Field(default_factory=list, max_length=100)
+    omitted_messages: int = Field(default=0, alias="omittedMessages", ge=0)
+    project: JsonObject | None = None
+
+    @field_validator("project")
+    @classmethod
+    def validate_project_size(cls, project: JsonObject | None) -> JsonObject | None:
+        # Nest acota la ficha; esto solo frena un cuerpo anómalo.
+        if project is not None and len(json.dumps(project)) > MAX_PROJECT_BYTES:
+            raise ValueError("La ficha del proyecto es demasiado grande.")
+        return project
+
     operations: list[AgentOperationRequest] = Field(max_length=256)
     context: AgentContextRequest = Field(default_factory=AgentContextRequest)
 
@@ -131,7 +155,12 @@ class AgentRunRequest(_Strict):
         return AgentRun(
             identity,
             self.message,
-            tuple(HistoryMessage(item.role, item.content) for item in self.history),
+            tuple(
+                HistoryMessage(item.role, item.content, item.activity)
+                for item in self.history
+            ),
             tuple(operation.to_domain() for operation in self.operations),
             self.context.to_domain(),
+            self.omitted_messages,
+            self.project,
         )

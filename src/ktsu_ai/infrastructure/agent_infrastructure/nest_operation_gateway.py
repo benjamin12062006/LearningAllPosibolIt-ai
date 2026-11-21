@@ -12,7 +12,6 @@ from ktsu_ai.application.agent_ports.out_operation_gateway import (
 )
 from ktsu_ai.domain.agent.agent_run import JsonObject, JsonValue, RunIdentity
 
-NEST_REJECTIONS: Final = frozenset({400, 403, 404, 409})
 UNAVAILABLE: Final = "No se pudo completar la operación en Nest."
 INVALID_PREPARATION: Final = "Nest no devolvió un resumen válido para confirmar."
 MAX_CONFIRMATION_LENGTH: Final = 16_000
@@ -61,8 +60,8 @@ class NestOperationGateway:
         except (httpx.RequestError, ValueError):
             raise OperationFailedError(UNAVAILABLE) from None
 
-        if response.status_code in NEST_REJECTIONS:
-            raise OperationFailedError(_rejection_message(response))
+        if _is_nest_rejection(response.status_code):
+            raise _rejection(response)
         if response.status_code == 204:
             return None
         if not response.is_success:
@@ -73,13 +72,34 @@ class NestOperationGateway:
             raise OperationFailedError(UNAVAILABLE) from None
 
 
-def _rejection_message(response: httpx.Response) -> str:
+def _is_nest_rejection(status: int) -> bool:
+    """Un 4xx con mensaje público. El 401 es de la credencial de la ejecución, no del modelo."""
+    return 400 <= status < 500 and status != 401
+
+
+def _rejection(response: httpx.Response) -> OperationFailedError:
     try:
         body = response.json()
     except ValueError:
-        return UNAVAILABLE
-    if isinstance(body, dict) and isinstance(message := body.get("message"), dict):
-        message_es = message.get("es")
-        if isinstance(message_es, str) and message_es.strip():
-            return message_es
-    return UNAVAILABLE
+        return OperationFailedError(UNAVAILABLE)
+    if not isinstance(body, dict):
+        return OperationFailedError(UNAVAILABLE)
+    message = body.get("message")
+    spanish = _text_in(message, "es")
+    if spanish is None:
+        return OperationFailedError(UNAVAILABLE)
+    code = body.get("code")
+    return OperationFailedError(
+        spanish,
+        code if isinstance(code, str) and code else None,
+        _text_in(message, "en"),
+    )
+
+
+def _text_in(message: JsonValue, language: str) -> str | None:
+    if not isinstance(message, dict):
+        return None
+    text = message.get(language)
+    if isinstance(text, str) and text.strip():
+        return text
+    return None

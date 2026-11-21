@@ -207,3 +207,106 @@ def test_run_accepts_the_context_from_nest_and_rejects_extra_fields(
 
 def client_post(client: TestClient, body: JsonObject) -> httpx.Response:
     return client.post(PATH, headers=AUTHORIZED, json=body)
+
+
+def test_run_accepts_history_activity_and_bounds_its_size(disabled: TestClient) -> None:
+    body = request_body()
+    body["history"] = [
+        {"role": "user", "content": "Borra duplicados"},
+        {
+            "role": "assistant",
+            "content": "Preparé el borrador.",
+            "activity": {"calls": [], "proposal": None},
+        },
+    ]
+    body["omittedMessages"] = 2
+    assert client_post(disabled, body).status_code == 503
+
+    body["history"][1]["activity"] = {"calls": ["x" * 70_000]}
+    assert client_post(disabled, body).status_code == 400
+    body["history"] = [{"role": "user", "content": "hola"}] * 101
+    assert client_post(disabled, body).status_code == 400
+    body["history"] = []
+    body["omittedMessages"] = -1
+    assert client_post(disabled, body).status_code == 400
+
+
+def test_history_activity_reaches_the_model_through_the_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "ktsu_ai.bootstrap.app.create_client",
+        lambda config: AsyncQdrantClient(location=":memory:"),
+    )
+    config = configuration_for(UNREACHABLE_QDRANT)
+    config.nest_agent_base_url = HttpUrl("http://nest.test")
+    scripted = ScriptedResponses(ChatMessage(role="assistant", content="Hecho."))
+    app = create_app(
+        config,
+        WordHashEmbedding(),
+        agent_llm=scripted.llm,
+        nest_transport=httpx.MockTransport(lambda request: httpx.Response(500)),
+    )
+    body = request_body()
+    body["history"] = [
+        {
+            "role": "assistant",
+            "content": "Preparé el borrador.",
+            "activity": {"proposal": {"status": "confirmed", "result": {"id": "c-9"}}},
+        }
+    ]
+    with TestClient(app) as client:
+        assert client_post(client, body).status_code == 200
+
+    sent = "\n".join(message.content or "" for message in scripted.messages[0])
+    assert "status: confirmed" in sent
+    assert "id: c-9" in sent
+
+
+def test_run_accepts_the_project_sheet_and_bounds_its_size(
+    disabled: TestClient,
+) -> None:
+    body = request_body()
+    body["project"] = {"project": {"name": "Tienda"}, "sheets": []}
+    assert client_post(disabled, body).status_code == 503
+    body["project"] = {"notes": "x" * 140_000}
+    assert client_post(disabled, body).status_code == 400
+
+
+def test_the_run_starts_with_related_knowledge_from_qdrant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organization, project = str(uuid4()), str(uuid4())
+    monkeypatch.setattr(
+        "ktsu_ai.bootstrap.app.create_client",
+        lambda config: AsyncQdrantClient(location=":memory:"),
+    )
+    config = configuration_for(UNREACHABLE_QDRANT)
+    config.nest_agent_base_url = HttpUrl("http://nest.test")
+    scripted = ScriptedResponses(ChatMessage(role="assistant", content="Hecho."))
+    app = create_app(
+        config,
+        WordHashEmbedding(),
+        agent_llm=scripted.llm,
+        nest_transport=httpx.MockTransport(lambda request: httpx.Response(500)),
+    )
+    source = (
+        f"/v1/knowledge/organizations/{organization}/projects/{project}"
+        f"/sources/catalog/{project}"
+    )
+    document = {
+        "documentId": "SKU-77",
+        "text": "Producto SKU-77 zapatillas rojas sin imagen en el feed",
+        "metadata": {},
+    }
+    body = request_body()
+    body["scope"] = {"organizationId": organization, "projectIds": [project]}
+    body["message"] = "¿Qué zapatillas rojas no tienen imagen?"
+    with TestClient(app) as client:
+        indexed = client.put(source, headers=AUTHORIZED, json={"documents": [document]})
+        assert indexed.status_code == 200
+        assert client_post(client, body).status_code == 200
+
+    system = scripted.messages[0][0].content or ""
+    assert "Conocimiento del proyecto relacionado" in system
+    assert "SKU-77" in system
