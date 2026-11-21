@@ -76,6 +76,7 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
         metadata = client.get("/.well-known/oauth-protected-resource/mcp")
         assert metadata.json()["authorization_servers"] == [ISSUER]
         assert metadata.json()["resource"] == RESOURCE
+        assert metadata.json()["scopes_supported"] == ["ktsu:mcp:read"]
         assert "protection-test-token" not in metadata.text
 
         request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
