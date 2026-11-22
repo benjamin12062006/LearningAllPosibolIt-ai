@@ -55,7 +55,22 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
                                 "type": "object",
                                 "additionalProperties": False,
                             },
-                        }
+                        },
+                        {
+                            "name": "prepare_sheet_edits",
+                            "level": "write",
+                            "description": "Preparar una edición de hoja",
+                            "inputSchema": {"type": "object"},
+                        },
+                        *(
+                            {
+                                "name": f"catalog_operation_{index}",
+                                "level": "read",
+                                "description": "Operación de prueba",
+                                "inputSchema": {"type": "object"},
+                            }
+                            for index in range(65)
+                        ),
                     ]
                 },
             )
@@ -98,9 +113,9 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
 
         tools = client.post("/mcp", json=request, headers=AUTH)
         assert tools.status_code == 200
-        assert [tool["name"] for tool in tools.json()["result"]["tools"]] == [
-            "get_project_overview"
-        ]
+        names = {tool["name"] for tool in tools.json()["result"]["tools"]}
+        assert len(names) == 67
+        assert {"get_project_overview", "prepare_sheet_edits"} <= names
         call = {
             "jsonrpc": "2.0",
             "id": 2,

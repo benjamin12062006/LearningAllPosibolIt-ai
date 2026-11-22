@@ -22,7 +22,8 @@ BASE_PATH: Final = "/internal/v1/mcp-integrations"
 # Nest responde con un mensaje público en estos casos; el resto es un fallo.
 NEST_REJECTIONS: Final = frozenset({400, 401, 403, 404, 409, 413, 422, 429})
 UNAVAILABLE: Final = "No se pudo completar la operación en KTSU."
-MAX_OPERATIONS: Final = 64
+# El catálogo de lectura y propuestas tiene 67 operaciones.
+MAX_OPERATIONS: Final = 128
 _JSON_VALUE = TypeAdapter(JsonValue)
 
 
