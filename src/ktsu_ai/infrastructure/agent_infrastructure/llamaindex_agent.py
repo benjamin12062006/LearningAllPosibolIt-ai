@@ -55,8 +55,9 @@ SYSTEM_PROMPT: Final = (
     # Nest sabe que la conversación espera a la persona por el estado
     # `needs_clarification`, que solo da la herramienta (bitácora 03 del agente).
     "Si falta información o algo es ambiguo, pregunta con la herramienta "
-    "ask_for_clarification, no en el texto de la respuesta. Una escritura requiere la "
-    "confirmación de la persona.\n"
+    "ask_for_clarification, no en el texto de la respuesta. Las escrituras se "
+    "aplican al momento, sin aprobación: no pidas permiso para aplicarlas, sigue "
+    "con la tarea y relee lo que cambiaste.\n"
     "Guía de trabajo de KTSU: cada proyecto reúne catálogos importados, revisiones "
     "de reglas, evaluaciones, productos, publicación del feed y libros con hojas. "
     "Empieza por get_project_overview si faltan referencias. El catálogo describe "
