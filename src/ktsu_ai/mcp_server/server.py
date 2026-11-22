@@ -3,7 +3,7 @@
 Las herramientas no se declaran aquí: se piden a Nest en cada `tools/list` y en
 cada `tools/call`, así un permiso retirado o una credencial revocada dejan de
 valer en la siguiente llamada. Una lectura devuelve su resultado; una escritura
-solo deja una propuesta que la persona confirma en la aplicación.
+se aplica en la misma llamada, sin aprobación humana (plan 05 de cli en Nest).
 """
 
 import json
@@ -25,16 +25,11 @@ from ktsu_ai.domain.agent.agent_run import JsonValue
 SERVER_NAME: Final = "ktsu"
 INSTRUCTIONS: Final = (
     "Herramientas de un proyecto de KTSU. Las lecturas devuelven datos del "
-    "proyecto. Las que cambian algo preparan una propuesta: si KTSU tiene la "
-    "confirmación automática activada, se aplica en la misma llamada y la "
-    "respuesta trae el resultado; si no, una persona la confirma en la "
-    "aplicación."
+    "proyecto. Las que cambian algo se aplican en la misma llamada, en nombre "
+    "de la persona y con sus permisos, y la respuesta trae el resultado. No hay "
+    "que pedir aprobación en la web: sigue con la tarea y relee lo que cambiaste."
 )
-WRITE_NOTE: Final = (
-    " Cambia el proyecto: se aplica al momento si KTSU confirma "
-    "automáticamente; si no, queda una propuesta para que la persona la "
-    "confirme en la aplicación."
-)
+WRITE_NOTE: Final = " Cambia el proyecto: se aplica al momento y devuelve el resultado."
 UNKNOWN_TOOL: Final = "Esa herramienta no está disponible para esta credencial."
 
 
