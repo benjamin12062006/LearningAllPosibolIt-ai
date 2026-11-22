@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from typing import Self
+from uuid import UUID
 
 import httpx
 import uvicorn
@@ -114,8 +115,20 @@ def create_app(
             ) not in (None, origin):
                 await JSONResponse({"error": "forbidden"}, 403)(scope, receive, send)
                 return
+            projects = request.query_params.getlist("project")
+            project_id: str | None = None
+            if projects:
+                try:
+                    project_id = str(UUID(projects[0]))
+                    if len(projects) != 1 or projects[0].lower() != project_id:
+                        raise ValueError
+                except ValueError:
+                    await JSONResponse({"error": "invalid_project"}, 400)(
+                        scope, receive, send
+                    )
+                    return
             headers = request.headers.getlist("authorization")
-            gateway = _oauth_gateway(client, settings, headers)
+            gateway = _oauth_gateway(client, settings, headers, project_id)
             if gateway is None:
                 await _challenge(metadata_url)(scope, receive, send)
                 return
@@ -137,7 +150,10 @@ def create_app(
 
 
 def _oauth_gateway(
-    client: httpx.AsyncClient, settings: McpHttpSettings, headers: list[str]
+    client: httpx.AsyncClient,
+    settings: McpHttpSettings,
+    headers: list[str],
+    project_id: str | None,
 ) -> NestIntegrationGateway | None:
     if len(headers) != 1 or len(headers[0]) > 8192:
         return None
@@ -145,7 +161,11 @@ def _oauth_gateway(
     if scheme.lower() != "bearer" or not token or any(char.isspace() for char in token):
         return None
     return NestIntegrationGateway(
-        client, settings.mcp_adapter_token.get_secret_value(), token, oauth=True
+        client,
+        settings.mcp_adapter_token.get_secret_value(),
+        token,
+        oauth=True,
+        project_id=project_id,
     )
 
 

@@ -189,3 +189,41 @@ def test_el_sdk_http_mantiene_tokens_separados_entre_clientes() -> None:
             )
 
     assert asyncio.run(run()) == ["actor-a", "actor-b"]
+
+
+def test_mcp_http_aisla_el_proyecto_indicado_en_la_url() -> None:
+    projects = []
+    project_id = "df68e46b-8e43-4a32-8ed1-da5405e2273c"
+    response_project = "piloto"
+
+    def nest(request: httpx.Request) -> httpx.Response:
+        projects.append(request.headers["X-Ktsu-Mcp-Project"])
+        if request.url.path.endswith("/session"):
+            return httpx.Response(200, json={"projectId": response_project})
+        return httpx.Response(200, json={"operations": []})
+
+    app = create_app(
+        McpHttpSettings(
+            nest_url=HttpUrl("http://127.0.0.1:8080"),
+            mcp_adapter_token=SecretStr("a" * 32),
+            mcp_resource_url=HttpUrl(RESOURCE),
+            mcp_oauth_issuer=HttpUrl(ISSUER),
+        ),
+        transport=httpx.MockTransport(nest),
+    )
+    request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    path = f"/mcp?project={project_id}"
+    with TestClient(app, base_url="https://mcp.ktsu.example") as client:
+        assert (
+            client.post(path + "&project=otro", json=request, headers=AUTH).status_code
+            == 400
+        )
+        assert projects == []
+        refused = client.post(path, json=request, headers=AUTH)
+        assert refused.status_code == 503
+        assert refused.json()["error"] == "MCP_PROJECT_MISMATCH"
+        assert projects == [project_id]
+
+        response_project = project_id
+        assert client.post(path, json=request, headers=AUTH).status_code == 200
+        assert projects == [project_id, project_id, project_id]

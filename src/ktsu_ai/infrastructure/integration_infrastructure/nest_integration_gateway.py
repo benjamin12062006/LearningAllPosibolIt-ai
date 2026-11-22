@@ -50,16 +50,37 @@ class NestIntegrationGateway:
         credential: str,
         *,
         oauth: bool = False,
+        project_id: str | None = None,
     ) -> None:
         self._client = client
+        self._project_id = project_id
         credential_header = "X-Ktsu-Mcp-OAuth" if oauth else "X-Ktsu-Delegation"
         self._headers = {
             "Authorization": f"Bearer {adapter_token}",
             credential_header: f"Bearer {credential}",
         }
 
+        if project_id is not None:
+            self._headers["X-Ktsu-Mcp-Project"] = project_id
+
     async def session(self) -> None:
-        await self._request("GET", f"{BASE_PATH}/session")
+        response = await self._request("GET", f"{BASE_PATH}/session")
+        if self._project_id is None:
+            return
+        try:
+            session = response.json()
+        except ValueError:
+            raise IntegrationRejectedError(UNAVAILABLE) from None
+        # Un Nest anterior puede ignorar la cabecera y devolver el piloto.
+        if (
+            not isinstance(session, dict)
+            or session.get("projectId") != self._project_id
+        ):
+            raise IntegrationRejectedError(
+                "KTSU no confirmó el proyecto solicitado.",
+                503,
+                "MCP_PROJECT_MISMATCH",
+            )
 
     async def operations(self) -> tuple[IntegrationOperation, ...]:
         response = await self._request("GET", f"{BASE_PATH}/operations")
