@@ -27,6 +27,7 @@ from ktsu_ai.mcp_server.server import build_mcp_server
 MCP_PATH = "/mcp"
 METADATA_PATH = "/.well-known/oauth-protected-resource/mcp"
 READ_SCOPE = "ktsu:mcp:read"
+PREPARE_SCOPE = "ktsu:mcp:prepare"
 MAX_BODY_BYTES = 64 * 1024
 
 
@@ -100,7 +101,7 @@ def create_app(
             {
                 "resource": resource,
                 "authorization_servers": [str(settings.mcp_oauth_issuer)],
-                "scopes_supported": [READ_SCOPE],
+                "scopes_supported": [READ_SCOPE, PREPARE_SCOPE],
                 "bearer_methods_supported": ["header"],
             }
         )

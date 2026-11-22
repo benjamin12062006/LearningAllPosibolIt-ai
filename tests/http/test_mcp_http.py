@@ -76,7 +76,10 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
         metadata = client.get("/.well-known/oauth-protected-resource/mcp")
         assert metadata.json()["authorization_servers"] == [ISSUER]
         assert metadata.json()["resource"] == RESOURCE
-        assert metadata.json()["scopes_supported"] == ["ktsu:mcp:read"]
+        assert metadata.json()["scopes_supported"] == [
+            "ktsu:mcp:read",
+            "ktsu:mcp:prepare",
+        ]
         assert "protection-test-token" not in metadata.text
 
         request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
@@ -86,6 +89,7 @@ def test_mcp_http_descubrimiento_catalogo_y_revocacion() -> None:
             'resource_metadata="https://mcp.ktsu.example/.well-known/oauth-protected-resource/mcp"'
             in absent.headers["WWW-Authenticate"]
         )
+        assert 'scope="ktsu:mcp:read"' in absent.headers["WWW-Authenticate"]
         origin = client.post(
             "/mcp", json=request, headers={**AUTH, "Origin": "https://other.example"}
         )

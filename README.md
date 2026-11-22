@@ -134,6 +134,13 @@ La prueba usa Qdrant en memoria por defecto. `KTSU_TEST_QDRANT_URL=http://127.0.
 
 ## MCP remoto con Descope
 
+Para preparar cambios en Codex, activa **Lectura y propuestas** en el proyecto y solicita ambos scopes al autenticar.
+
+```sh
+codex mcp login ktsu-remoto --scopes ktsu:mcp:read,ktsu:mcp:prepare
+```
+
+
 El servidor HTTP vive en el mismo paquete que el MCP local. El proxy HTTPS publica únicamente `/mcp` y `/.well-known/oauth-protected-resource/mcp`. Conserva el `Host` público. Nest sigue privado para este proceso.
 
 1. Define primero un endpoint HTTPS estable para staging con ruta `/mcp`. Usa la misma URL exacta en el borde, en el Resource de Descope y en ambos backends.
